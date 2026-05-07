@@ -180,6 +180,18 @@ func (o *Owner) runOnce(ctx context.Context) error {
 				o.logger.Debug("parse error", "err", err, "raw", string(line))
 				continue
 			}
+			// Per-frame debug trace (visible only with -v). Useful for
+			// correlating wire data against TX state when the meter's
+			// readouts look stuck or wrong.
+			o.logger.Debug("frame",
+				"raw", string(line),
+				"power_w", snap.PowerW,
+				"dbm", snap.DBm,
+				"swr", snap.SWR,
+				"z", snap.ZOhm,
+				"phase", snap.PhaseDeg,
+				"range", snap.Range,
+				"mode", snap.Mode)
 			select {
 			case o.out <- snap:
 			case <-ctx.Done():
