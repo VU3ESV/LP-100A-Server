@@ -88,18 +88,22 @@ After the first install, push subsequent changes from your dev machine with
 ```sh
 ./deploy/redeploy.sh pi@raspberrypi.local           # rebuild, scp, restart
 ./deploy/redeploy.sh pi@host --service              # also push systemd unit
+./deploy/redeploy.sh pi@host --keep-config          # binary only (skip toml/udev)
 ./deploy/redeploy.sh pi@host --restart-only         # skip build; just bounce the service
 ARCH=arm ./deploy/redeploy.sh pi@host               # 32-bit ARMv7 target
 ```
 
-The script cross-compiles, scp's the binary into `/tmp/` on the Pi, stops the
-service, swaps the binary atomically with `install`, restarts, tails the last
-few journal lines, and finally hits `/healthz`. It needs SSH key auth and
-passwordless sudo (the Raspberry Pi OS default).
+By default redeploy refreshes both the application binary **and** the
+`config.toml` / udev rule from the templates in `deploy/`. The user's
+`serial.port` value is detected and re-applied to the new config so a
+custom device path (e.g. `/dev/serial/by-id/usb-FTDI_…`) survives the
+update. The previous `config.toml` and udev rule are saved alongside
+themselves with `.bak.YYYYMMDD-HHMMSS` suffixes before they're replaced,
+so you can always diff or roll back.
 
-Redeploy deliberately **does not touch** `/etc/lp100a-server/config.toml` or
-`/etc/udev/rules.d/99-lp100a.rules` — those are operator-managed. To change
-either, edit the file on the Pi directly, or re-run `install.sh`.
+Pass `--keep-config` if you've heavily customized `config.toml` (e.g.
+edited `enabled_views` or `listen`) and want to keep it untouched —
+only the binary will be updated.
 
 ## Configuration
 

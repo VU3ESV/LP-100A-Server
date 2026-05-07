@@ -2,60 +2,64 @@
 # Redeploy lp100a-server to a Raspberry Pi (or any systemd Linux box where
 # install.sh has already run once). Run this from your dev machine.
 #
-# Scope:
-#   This script only updates the application binary (and, with --service, the
-#   systemd unit file). It NEVER touches:
-#     - /etc/lp100a-server/config.toml      (operator-managed config)
-#     - /etc/udev/rules.d/99-lp100a.rules   (operator-managed device rules)
-#   To change either, edit the file on the Pi directly, or re-run install.sh
-#   which is the authoritative path for changes to system config.
+# Default scope (run on every redeploy):
+#   - /usr/local/bin/lp100a-server                 application binary
+#   - /etc/lp100a-server/config.toml               server config (template)
+#   - /etc/udev/rules.d/99-lp100a.rules            device rule (template)
 #
-# What it does:
-#   1. Cross-compiles the binary (skips if --restart-only)
-#   2. Opens a single multiplexed SSH session to the target (one auth prompt)
-#   3. scp's the binary + a remote install script to /tmp/
-#   4. Runs the script under `ssh -t` so sudo can prompt for a password
-#      (and so passwordless sudo also works without complaint)
-#   5. Hits /healthz to confirm the service is live
+# Preserved from the existing config (the user's customization survives):
+#   - serial.port                                  the COM/device path
+#
+# Backups:
+#   The previous /etc/lp100a-server/config.toml and /etc/udev/rules.d/99-lp100a.rules
+#   are saved next to themselves with a .bak.YYYYMMDD-HHMMSS suffix before they
+#   are replaced, so you can always diff or restore.
+#
+# Optional flags:
+#   --service       also reinstall /etc/systemd/system/lp100a-server.service
+#   --keep-config   skip config.toml + udev rule replacement (binary only)
+#   --restart-only  skip the build and the file copies; just bounce the service
+#   --no-healthcheck  skip the curl /healthz step at the end
 #
 # Auth:
 #   Recommended  : SSH key auth + passwordless sudo (one quiet redeploy).
-#   Also fine    : SSH password + interactive sudo password (you'll be
-#                  prompted at most twice — once for SSH, once for sudo).
-#   To set up keys: ssh-copy-id pi@host
-#   To set up passwordless sudo on the Pi:
+#   Also fine    : SSH password + interactive sudo password.
+#   Set up keys: ssh-copy-id pi@host
+#   Set up passwordless sudo on the Pi:
 #     echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-nopasswd
 #
 # Prerequisites on the Pi:
-#   - install.sh has already run once (creates user, service, paths, udev rule, config)
+#   - install.sh has already run once (creates user, service, paths)
 #
 # Usage:
 #   ./deploy/redeploy.sh pi@raspberrypi.local
-#   ARCH=arm ./deploy/redeploy.sh pi@raspberrypi.local      # 32-bit ARMv7
-#   ./deploy/redeploy.sh pi@host --service                  # also reinstall systemd unit
-#   ./deploy/redeploy.sh pi@host --restart-only             # skip build, just restart
-#   ./deploy/redeploy.sh pi@host --no-healthcheck           # skip the curl /healthz step
+#   ARCH=arm ./deploy/redeploy.sh pi@host                 # 32-bit ARMv7
+#   ./deploy/redeploy.sh pi@host --service                # also push systemd unit
+#   ./deploy/redeploy.sh pi@host --keep-config            # binary only
+#   ./deploy/redeploy.sh pi@host --restart-only           # bounce service only
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TARGET="${1:-}"
 if [ -z "$TARGET" ]; then
-  echo "usage: $0 user@host [--service] [--restart-only] [--no-healthcheck]" >&2
+  echo "usage: $0 user@host [--service] [--keep-config] [--restart-only] [--no-healthcheck]" >&2
   exit 1
 fi
 shift
 
 UPDATE_SERVICE=0
+KEEP_CONFIG=0
 RESTART_ONLY=0
 HEALTHCHECK=1
 for arg in "$@"; do
   case "$arg" in
     --service)         UPDATE_SERVICE=1 ;;
+    --keep-config)     KEEP_CONFIG=1 ;;
     --restart-only)    RESTART_ONLY=1 ;;
     --no-healthcheck)  HEALTHCHECK=0 ;;
     --udev|--config)
-      echo "$arg is not supported by redeploy: udev rules and config.toml are operator-managed." >&2
-      echo "Edit them on the Pi directly, or re-run install.sh." >&2
+      echo "$arg is no longer needed: redeploy now updates udev rules and config.toml by default." >&2
+      echo "Use --keep-config to opt out." >&2
       exit 1
       ;;
     *) echo "unknown flag: $arg" >&2; exit 1 ;;
@@ -70,6 +74,9 @@ case "$ARCH" in
 esac
 BIN="dist/$BIN_NAME"
 
+# When --restart-only is set, --keep-config is implied (nothing to install).
+if [ "$RESTART_ONLY" -eq 1 ]; then KEEP_CONFIG=1; fi
+
 if ! command -v ssh >/dev/null 2>&1; then echo "ssh not found in PATH" >&2; exit 1; fi
 if ! command -v scp >/dev/null 2>&1; then echo "scp not found in PATH" >&2; exit 1; fi
 if [ "$RESTART_ONLY" -eq 0 ] && ! command -v go >/dev/null 2>&1; then
@@ -81,8 +88,6 @@ step() { printf '\n\033[1;36m>>>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!! %s\033[0m\n' "$*"; }
 
 # --- SSH connection multiplexing -------------------------------------------
-# One ControlMaster connection serves all scp + ssh calls below, so password
-# auth (if used) only prompts once.
 SSH_TMPDIR=$(mktemp -d -t lp100a-ssh.XXXXXX)
 SSH_CTRL="$SSH_TMPDIR/cm.sock"
 SSH_OPTS=(-o "ControlMaster=auto" -o "ControlPath=$SSH_CTRL" -o "ControlPersist=120s")
@@ -111,14 +116,17 @@ build_remote() {
 #!/usr/bin/env bash
 set -euo pipefail
 echo "host: $(hostname) — kernel: $(uname -r)"
+TS="$(date +%Y%m%d-%H%M%S)"
 sudo systemctl stop lp100a-server 2>/dev/null || true
 HEAD
+
   if [ "$RESTART_ONLY" -eq 0 ]; then
     cat <<HEAD
 sudo install -m 0755 -o root -g root "/tmp/$(basename "$BIN")" /usr/local/bin/lp100a-server
 rm -f "/tmp/$(basename "$BIN")"
 HEAD
   fi
+
   if [ "$UPDATE_SERVICE" -eq 1 ]; then
     cat <<'HEAD'
 sudo install -m 0644 -o root -g root /tmp/lp100a-server.service /etc/systemd/system/lp100a-server.service
@@ -126,6 +134,58 @@ sudo systemctl daemon-reload
 rm -f /tmp/lp100a-server.service
 HEAD
   fi
+
+  if [ "$KEEP_CONFIG" -eq 0 ]; then
+    cat <<'HEAD'
+
+# ---- udev rule: backup + replace ----
+if [ -f /etc/udev/rules.d/99-lp100a.rules ]; then
+  sudo cp -p /etc/udev/rules.d/99-lp100a.rules \
+             "/etc/udev/rules.d/99-lp100a.rules.bak.$TS"
+  echo "  backed up: /etc/udev/rules.d/99-lp100a.rules.bak.$TS"
+fi
+sudo install -m 0644 -o root -g root /tmp/99-lp100a.rules /etc/udev/rules.d/99-lp100a.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+rm -f /tmp/99-lp100a.rules
+
+# ---- config.toml: backup + replace, preserving serial.port ----
+sudo install -d -m 0755 /etc/lp100a-server
+USER_PORT_LINE=""
+if [ -f /etc/lp100a-server/config.toml ]; then
+  USER_PORT_LINE="$(awk '
+    /^[[:space:]]*\[serial\][[:space:]]*$/ { in_serial=1; next }
+    /^[[:space:]]*\[/ { in_serial=0 }
+    in_serial && /^[[:space:]]*port[[:space:]]*=/ { print; exit }
+  ' /etc/lp100a-server/config.toml)"
+  sudo cp -p /etc/lp100a-server/config.toml \
+             "/etc/lp100a-server/config.toml.bak.$TS"
+  echo "  backed up: /etc/lp100a-server/config.toml.bak.$TS"
+  if [ -n "$USER_PORT_LINE" ]; then
+    echo "  preserving serial.port: $USER_PORT_LINE"
+  fi
+fi
+
+# Substitute the user's port line into the new template (if we have one).
+TMP_NEW="$(mktemp)"
+if [ -n "$USER_PORT_LINE" ]; then
+  awk -v repl="$USER_PORT_LINE" '
+    /^[[:space:]]*\[serial\][[:space:]]*$/ { in_serial=1; print; next }
+    /^[[:space:]]*\[/ { in_serial=0; print; next }
+    in_serial && /^[[:space:]]*port[[:space:]]*=/ {
+      print repl
+      next
+    }
+    { print }
+  ' /tmp/config.example.toml > "$TMP_NEW"
+else
+  cp /tmp/config.example.toml "$TMP_NEW"
+fi
+sudo install -m 0644 -o root -g root "$TMP_NEW" /etc/lp100a-server/config.toml
+rm -f "$TMP_NEW" /tmp/config.example.toml
+HEAD
+  fi
+
   cat <<'TAIL'
 sudo systemctl start lp100a-server
 sleep 1
@@ -140,7 +200,7 @@ TAIL
 }
 build_remote > "$LOCAL_SCRIPT"
 
-# --- 3. Open the SSH control connection (one auth prompt) ------------------
+# --- 3. Open the SSH control connection ------------------------------------
 step "Opening SSH session to $TARGET"
 if ! ssh "${SSH_OPTS[@]}" -o "ConnectTimeout=10" "$TARGET" true; then
   echo "could not establish SSH session to $TARGET" >&2
@@ -149,16 +209,13 @@ fi
 
 # --- 4. Copy files to /tmp/ on the Pi --------------------------------------
 SCP_FILES=()
-[ "$RESTART_ONLY" -eq 0 ]   && SCP_FILES+=("$BIN")
+[ "$RESTART_ONLY"   -eq 0 ] && SCP_FILES+=("$BIN")
 [ "$UPDATE_SERVICE" -eq 1 ] && SCP_FILES+=(deploy/lp100a-server.service)
-SCP_FILES+=("$LOCAL_SCRIPT")  # the install script always goes along
+[ "$KEEP_CONFIG"    -eq 0 ] && SCP_FILES+=(deploy/99-lp100a.rules deploy/config.example.toml)
 
-step "Copying ${#SCP_FILES[@]} file(s) to $TARGET:/tmp/"
-# We need a stable remote name for the install script regardless of mktemp's
-# local basename. scp the regular files first, then the script under a fixed
-# remote path.
-if [ "${#SCP_FILES[@]}" -gt 1 ]; then
-  scp -q "${SSH_OPTS[@]}" "${SCP_FILES[@]:0:${#SCP_FILES[@]}-1}" "$TARGET:/tmp/"
+step "Copying ${#SCP_FILES[@]} support file(s) + install script to $TARGET:/tmp/"
+if [ "${#SCP_FILES[@]}" -gt 0 ]; then
+  scp -q "${SSH_OPTS[@]}" "${SCP_FILES[@]}" "$TARGET:/tmp/"
 fi
 REMOTE_SCRIPT="/tmp/lp100a-redeploy.sh"
 scp -q "${SSH_OPTS[@]}" "$LOCAL_SCRIPT" "$TARGET:$REMOTE_SCRIPT"
