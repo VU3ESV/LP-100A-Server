@@ -1,0 +1,69 @@
+name: Release
+
+# Manually triggered from the Actions tab. Provide a tag like "v1.0.0";
+# the workflow tags the current main commit, cross-compiles for every
+# supported platform, and publishes a GitHub Release with the binaries
+# attached and changelog auto-generated from commits since the previous
+# release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (must look like vX.Y.Z, e.g. v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # needed to create tags/releases and upload assets
+
+jobs:
+  release:
+    name: build + publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so auto-generated notes can diff against the previous tag
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Validate version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version must look like vX.Y.Z (got: $VERSION)"
+            exit 1
+          fi
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "::error::tag $VERSION already exists"
+            exit 1
+          fi
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: '0'
+          LDFLAGS: '-s -w'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          GOOS=linux   GOARCH=amd64           go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-linux-amd64 .
+          GOOS=linux   GOARCH=arm64           go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-linux-arm64 .
+          GOOS=linux   GOARCH=arm   GOARM=7   go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-linux-armv7 .
+          GOOS=darwin  GOARCH=amd64           go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64           go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-darwin-arm64 .
+          GOOS=windows GOARCH=amd64           go build -trimpath -ldflags="$LDFLAGS" -o dist/lp100a-server-windows-amd64.exe .
+          (cd dist && sha256sum lp100a-server-* > SHA256SUMS)
+          ls -la dist/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" \
+            --target "${{ github.sha }}" \
+            --title "${{ inputs.version }}" \
+            --generate-notes \
+            dist/*

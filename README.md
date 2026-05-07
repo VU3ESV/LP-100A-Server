@@ -38,6 +38,26 @@ ARCH=arm ./deploy/build-pi.sh
 
 Cross-compilation needs no C toolchain — the serial library is pure Go.
 
+## CI / releases
+
+Two GitHub Actions workflows ship with the repo:
+
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push
+  and pull request to `main`: `go vet`, `go test -race`, `go build`. Required
+  before merging a branch.
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) is
+  triggered manually from the **Actions** tab. Pick *Release* → *Run
+  workflow*, type a tag like `v1.0.0`, and it will:
+  1. Tag the current `main` commit,
+  2. Cross-compile binaries for `linux/{amd64,arm64,armv7}`,
+     `darwin/{amd64,arm64}`, and `windows/amd64`,
+  3. Publish a GitHub Release with the binaries + a `SHA256SUMS` file
+     attached and changelog auto-generated from commits since the previous
+     release.
+
+  Locally you don't need to run anything — Watchers of the repo get a
+  GitHub notification when the release is published.
+
 ## Deploying on the Raspberry Pi
 
 1. Copy the project to the Pi (or just the binary plus `deploy/`):
