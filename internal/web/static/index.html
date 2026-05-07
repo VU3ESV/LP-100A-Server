@@ -271,39 +271,6 @@
   .compass .lbl.l-up   { left: calc(50% - 12px); top: 4px; }
   .compass .lbl.l-down { left: calc(50% - 14px); bottom: 4px; }
 
-  /* ----- DBM / RL view ----------------------------------------------------*/
-  .dbm-stack { display: flex; flex-direction: column; gap: 14px; }
-  .dbm-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px dashed #1f2a35;
-  }
-  .dbm-row .lbl {
-    color: var(--label);
-    font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase;
-  }
-  .dbm-row .val {
-    font: 700 38px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-    color: var(--power);
-    text-shadow: 0 0 14px var(--power-glow);
-  }
-  .dbm-row.secondary .val { font-size: 26px; color: var(--swr-fg); text-shadow: 0 0 10px var(--swr-glow); }
-  .dbm-row .val .u { font-size: 14px; color: var(--label); margin-left: 6px; }
-  .dbm-track {
-    position: relative;
-    height: 12px; margin-top: 6px;
-    background: var(--grid);
-    border: 1px solid #000; border-radius: 3px;
-    overflow: hidden;
-  }
-  .dbm-track > .fill {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 0;
-    background: linear-gradient(90deg, #0aa088 0%, var(--bar) 100%);
-    box-shadow: 0 0 8px var(--bar-glow);
-    transition: width 120ms linear;
-  }
-
   /* ----- bottom screen status row + buttons -------------------------------*/
   .screen-foot {
     display: flex; flex-wrap: wrap; gap: 14px;
@@ -350,89 +317,6 @@
   button.key:hover:not(:disabled) { background: linear-gradient(180deg, #25303a 0%, #161c25 100%); }
   button.key:active:not(:disabled) { transform: translateY(1px); }
   button.key:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  /* ----- FIELD STRENGTH view ---------------------------------------------*/
-  .fs-stack { display: flex; flex-direction: column; gap: 14px; }
-  .fs-readout {
-    text-align: center;
-    padding: 8px 0 14px;
-    border-bottom: 1px dashed #1f2a35;
-  }
-  .fs-readout .v {
-    color: var(--power);
-    font: 700 56px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 18px var(--power-glow);
-    letter-spacing: -1px;
-  }
-  .fs-readout .u {
-    color: var(--label);
-    font-size: 16px;
-    margin-left: 6px;
-  }
-  .fs-readout .lin {
-    color: var(--label);
-    font-size: 12px;
-    margin-top: 6px;
-    letter-spacing: 0.6px;
-  }
-  .fs-track {
-    position: relative;
-    height: 14px;
-    background: var(--grid);
-    border: 1px solid #000; border-radius: 3px;
-    overflow: hidden;
-  }
-  .fs-track > .fill {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 0;
-    background: linear-gradient(90deg, #0aa088 0%, var(--bar) 100%);
-    box-shadow: 0 0 8px var(--bar-glow);
-    transition: width 120ms linear;
-  }
-  .fs-ticks {
-    display: flex; justify-content: space-between;
-    margin-top: 4px;
-    color: var(--tick);
-    font-size: 10px; font-variant-numeric: tabular-nums;
-  }
-  .fs-note {
-    color: var(--label);
-    font-size: 11px;
-    line-height: 1.5;
-    border-left: 2px solid rgba(241,196,15,0.4);
-    padding: 6px 12px;
-    background: rgba(241,196,15,0.04);
-    border-radius: 0 4px 4px 0;
-  }
-
-  /* ----- PEAK / AVG view --------------------------------------------------*/
-  .pkavg-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 14px;
-    margin-bottom: 14px;
-  }
-  .pkavg-cell {
-    border: 1px dashed #1f2a35;
-    border-radius: 6px;
-    padding: 12px 14px;
-    text-align: center;
-  }
-  .pkavg-cell .lbl {
-    color: var(--label);
-    font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase;
-  }
-  .pkavg-cell .val {
-    color: var(--accent);
-    font: 700 26px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-    margin-top: 6px;
-  }
-  .pkavg-cell .val.amber  { color: var(--power); text-shadow: 0 0 12px var(--power-glow); }
-  .pkavg-cell .val.bright { color: var(--swr-fg); text-shadow: 0 0 8px var(--swr-glow); }
-  .pkavg-cell .u {
-    color: var(--label); font-size: 12px; margin-left: 4px;
-  }
 
   /* ----- SETUP view -------------------------------------------------------*/
   .sync-box {
@@ -547,8 +431,6 @@
     .num-swr { font-size: 26px; margin-top: 10px; }
     .vector-grid { grid-template-columns: 1fr; }
     .compass { margin: 0 auto; }
-    .pkavg-grid { grid-template-columns: 1fr; }
-    .fs-readout .v { font-size: 44px; }
   }
 </style>
 </head>
@@ -650,80 +532,6 @@
       </div>
     </div>
 
-    <!-- ============= dBm / RL ============= -->
-    <div class="view" data-view="dbm">
-      <div class="dbm-stack">
-        <div>
-          <div class="dbm-row">
-            <span class="lbl">Forward Power</span>
-            <span class="val"><span id="dbm-dbm">--</span><span class="u">dBm</span></span>
-          </div>
-          <div class="dbm-track"><div class="fill" id="dbm-bar"></div></div>
-        </div>
-        <div>
-          <div class="dbm-row">
-            <span class="lbl">Return Loss</span>
-            <span class="val"><span id="dbm-rl">--</span><span class="u">dB</span></span>
-          </div>
-          <div class="dbm-track"><div class="fill" id="rl-bar"></div></div>
-        </div>
-        <div class="dbm-row secondary">
-          <span class="lbl">Power · SWR · |Γ|²</span>
-          <span class="val">
-            <span id="dbm-w">--</span><span class="u" id="dbm-w-unit">W</span>
-            &nbsp;·&nbsp; <span id="dbm-swr">--</span>
-            &nbsp;·&nbsp; <span id="dbm-mismatch">--</span><span class="u">%</span>
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============= FIELD STRENGTH ============= -->
-    <div class="view" data-view="field_strength">
-      <div class="fs-stack">
-        <div class="fs-readout">
-          <div><span class="v" id="fs-dbm">--</span><span class="u">dBm</span></div>
-          <div class="lin">linear: <span id="fs-lin">--</span></div>
-        </div>
-        <div class="fs-track"><div class="fill" id="fs-bar"></div></div>
-        <div class="fs-ticks">
-          <span>−15 dBm</span><span>0</span><span>+15</span><span>+33 dBm</span>
-        </div>
-        <div class="fs-note">
-          Calibrated field strength uses the meter's <strong>Direct Input</strong>
-          jacks on the rear panel, not the couplers. Range is −15 to +33 dBm
-          (max input 2 W). To use this mode, enable
-          <em>Direct Input (FS)</em> in the meter's SETUP → Opt. Mode Display
-          and feed signal directly to the rear-panel input.
-        </div>
-      </div>
-    </div>
-
-    <!-- ============= PEAK / AVG / RATIO ============= -->
-    <div class="view" data-view="peak_avg">
-      <div class="pkavg-grid">
-        <div class="pkavg-cell">
-          <div class="lbl">Peak</div>
-          <div class="val amber"><span id="pk-peak">--</span><span class="u">W</span></div>
-        </div>
-        <div class="pkavg-cell">
-          <div class="lbl">Average</div>
-          <div class="val bright"><span id="pk-avg">--</span><span class="u">W</span></div>
-        </div>
-        <div class="pkavg-cell">
-          <div class="lbl">Ratio</div>
-          <div class="val"><span id="pk-ratio">--</span><span class="u">dB</span></div>
-        </div>
-      </div>
-      <div class="fs-note">
-        Peak / Average / Ratio derived <strong>client-side</strong> over a
-        rolling 2-second window of samples. The meter itself reports a single
-        power value per poll; peak ≈ max(window), avg ≈ mean(window),
-        ratio = 10·log₁₀(peak / avg). Indicates speech-processing
-        compression — <em>higher ratio = less compression</em>.
-      </div>
-    </div>
-
     <!-- ============= SETUP REFERENCE ============= -->
     <div class="view" data-view="setup">
       <div class="sync-box">
@@ -780,11 +588,8 @@
   // factory configuration (Normal + Vector only). Set the [ui] enabled_views
   // list in the server config to enable additional views.
   const VIEW_LABELS = {
-    normal:         "NORMAL",
-    vector:         "VECTOR Z",
-    dbm:            "DBM / RL",
-    field_strength: "FIELD STR.",
-    peak_avg:       "PEAK / AVG",
+    normal: "NORMAL",
+    vector: "VECTOR Z",
   };
 
   // Power-mode suffix the LP-100A LCD appends to the Power readout to
@@ -895,52 +700,19 @@
     $("alarm-label").textContent = d.alarm_setpoint || "off";
     $("alarm-pill").classList.toggle("alarm-tripped", !!d.alarm_tripped);
 
-    // Always update the rolling window so peak/avg has data when we land on it.
-    pushPkAvgSample(d.power_w);
-
     if (setupOpen) return;  // setup view is static
 
-    if      (view === "normal")          renderNormal(d);
-    else if (view === "vector")          renderVector(d);
-    else if (view === "dbm")             renderDbm(d);
-    else if (view === "field_strength")  renderFieldStrength(d);
-    else if (view === "peak_avg")        renderPeakAvg(d);
-  }
-
-  // Effective Power / dBm helpers. The LP-100A's two numeric fields can
-  // disagree depending on its SETUP: the SWR Power Threshold setting can
-  // gate the Power field over serial (it reads 0 while a real signal is
-  // present), but the dBm field continues to report the detector reading.
-  // We trust whichever field has data above the detector's noise floor
-  // and back-compute the other from it. Thresholds:
-  //   Power > 0.01 W (10 mW)  → Power field has real data
-  //   dBm   > 1.5    (1.4 mW) → dBm   field has real data (above ~0.8 noise floor)
-  function isLive(d) {
-    return d.dbm > 1.5 || d.power_w > 0.01;
-  }
-  function effectivePower(d) {
-    if (d.power_w > 0.01) return d.power_w;
-    if (d.dbm > 1.5)      return Math.pow(10, (d.dbm - 30) / 10);
-    return 0;
-  }
-  function effectiveDbm(d) {
-    if (d.dbm > 1.5)      return d.dbm;
-    if (d.power_w > 0.01) return 10 * Math.log10(d.power_w * 1000);
-    return 0;
+    if      (view === "normal") renderNormal(d);
+    else if (view === "vector") renderVector(d);
   }
 
   function renderNormal(d) {
     // Power suffix follows the meter's mode (w / W / T per the LP-100A LCD).
     $("pwr-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
 
-    const live  = isLive(d);
-    const watts = effectivePower(d);
-    const dbm   = effectiveDbm(d);
-    const dbw   = dbm > 30 ? dbm - 30 : 0;
-
-    $("pwr-num").textContent = fmt(watts, 1);
-    $("dbm").textContent = live ? fmt(dbm, 1) : "--";
-    $("dbw").textContent = live ? fmt(dbw, 1) : "--";
+    $("pwr-num").textContent = fmt(d.power_w, 1);
+    $("dbw").textContent     = fmt(d.dbw, 1);
+    $("dbm").textContent     = fmt(d.dbm, 1);
 
     $("swr-num").textContent = fmt(d.swr, 2);
     $("z").textContent       = fmt(d.z_ohm, 1);
@@ -948,8 +720,8 @@
 
     updatePwrTicks(d.range);
     const pwrMax = RANGE_MAX[d.range] || 750;
-    $("pwr-fill").style.width = pctClamp((watts / pwrMax) * 100) + "%";
-    $("bar-pwr-val").textContent = fmt(watts, 1) + " " + (POWER_MODE_SUFFIX[d.mode] || "W");
+    $("pwr-fill").style.width = pctClamp((d.power_w / pwrMax) * 100) + "%";
+    $("bar-pwr-val").textContent = fmt(d.power_w, 1) + " " + (POWER_MODE_SUFFIX[d.mode] || "W");
 
     const swrPct = pctClamp(((d.swr - 1.0) / (SWR_MAX - 1.0)) * 100);
     const swrFill = $("swr-fill");
@@ -959,7 +731,7 @@
     $("bar-swr-val").textContent = fmt(d.swr, 2);
 
     const now = performance.now();
-    if (watts > peakPwr) { peakPwr = watts; peakPwrAt = now; }
+    if (d.power_w > peakPwr) { peakPwr = d.power_w; peakPwrAt = now; }
     if (d.swr > peakSwr) { peakSwr = d.swr; peakSwrAt = now; }
   }
 
@@ -994,87 +766,6 @@
     dot.style.left = `calc(50% + ${tipX.toFixed(1)}px - 4px)`;
     dot.style.top  = `calc(50% + ${tipY.toFixed(1)}px - 4px)`;
     dot.style.opacity = 1;
-  }
-
-  function renderFieldStrength(d) {
-    // Use the same effective-value logic as DBM/RL. The meter's dBm field
-    // reads detector noise floor (~0.8 dBm) when no signal is on the
-    // rear-panel direct input; real FS readings above ~1.5 dBm come
-    // through. If a TX signal is present (Power field active), we'll
-    // back-compute and show that too.
-    const live = isLive(d);
-    const dbm  = effectiveDbm(d);
-
-    $("fs-dbm").textContent = live ? fmt(dbm, 1) : "--";
-
-    if (live) {
-      const lin_w = Math.pow(10, (dbm - 30) / 10);
-      let linear;
-      if (lin_w >= 1)          linear = fmt(lin_w, 2) + " W";
-      else if (lin_w >= 0.001) linear = fmt(lin_w * 1000, 1) + " mW";
-      else                     linear = fmt(lin_w * 1e6, 0) + " µW";
-      $("fs-lin").textContent  = linear;
-      // Bar maps -15..+33 dBm -> 0..100%
-      $("fs-bar").style.width  = pctClamp(((dbm - (-15)) / (33 - (-15))) * 100) + "%";
-    } else {
-      $("fs-lin").textContent = "--";
-      $("fs-bar").style.width = "0%";
-    }
-  }
-
-  // Rolling window for Peak/Avg view (and any future analytics).
-  const PK_AVG_WINDOW_MS = 2000;
-  const pkAvgWindow = []; // [{ts, p}]
-  function pushPkAvgSample(p) {
-    if (typeof p !== "number" || Number.isNaN(p)) return;
-    const now = performance.now();
-    pkAvgWindow.push({ ts: now, p });
-    while (pkAvgWindow.length && now - pkAvgWindow[0].ts > PK_AVG_WINDOW_MS) {
-      pkAvgWindow.shift();
-    }
-  }
-  function renderPeakAvg() {
-    if (pkAvgWindow.length === 0) {
-      $("pk-peak").textContent = "--";
-      $("pk-avg").textContent  = "--";
-      $("pk-ratio").textContent = "--";
-      return;
-    }
-    let peak = 0, sum = 0;
-    for (const s of pkAvgWindow) {
-      if (s.p > peak) peak = s.p;
-      sum += s.p;
-    }
-    const avg = sum / pkAvgWindow.length;
-    const ratio = avg > 0.01 ? 10 * Math.log10(peak / Math.max(avg, 1e-6)) : 0;
-    $("pk-peak").textContent  = fmt(peak, 1);
-    $("pk-avg").textContent   = fmt(avg, 1);
-    $("pk-ratio").textContent = fmt(ratio, 1);
-  }
-
-  function renderDbm(d) {
-    $("dbm-w-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
-
-    const live  = isLive(d);
-    const watts = effectivePower(d);
-    const dbm   = effectiveDbm(d);
-
-    $("dbm-dbm").textContent = live ? fmt(dbm, 1) : "--";
-    $("dbm-w").textContent   = fmt(watts, 1);
-    $("dbm-swr").textContent = fmt(d.swr, 2);
-
-    // RL = -20·log10(|Γ|), |Γ| = (SWR-1)/(SWR+1). Conventionally shown
-    // positive (higher = better match). Perfect match -> ∞ dB.
-    const gamma = d.swr > 1 ? (d.swr - 1) / (d.swr + 1) : 0;
-    const rl = gamma > 0 ? -20 * Math.log10(gamma) : Infinity;
-    $("dbm-rl").textContent = isFinite(rl) ? fmt(rl, 1) : "∞";
-    $("dbm-mismatch").textContent = fmt(gamma * gamma * 100, 2);
-
-    // dBm bar: scale 0..70 dBm (1 µW to 10 kW).
-    $("dbm-bar").style.width = live ? pctClamp((dbm / 70) * 100) + "%" : "0%";
-    // RL bar: 0 dB (worst) to 40 dB (excellent), full bar at 40 dB.
-    const rlPct = isFinite(rl) ? pctClamp((rl / 40) * 100) : 100;
-    $("rl-bar").style.width = rlPct + "%";
   }
 
   // ---------------------------------------------------------------------

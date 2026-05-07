@@ -21,17 +21,13 @@ max_clients   = 32
 allow_control = true
 
 [ui]
-# Web Mode-button cycle order. MUST match the modes the meter cycles
-# through in its "Opt. Mode Display" SETUP screen, otherwise the web view
-# and the LP-100A's LCD will drift after each press of Mode. The web has
-# a re-alignment picker in the SETUP overlay if they get out of sync.
+# Web Mode-button cycle order. The two always-on LP-100A modes:
 #
-#   "normal"          — power + SWR bargraphs (always enabled on the meter)
-#   "vector"          — |Z|, phase, R, X with polar compass (always enabled)
-#   "dbm"             — dBm + Return Loss + mismatch loss
-#   "field_strength"  — dBm via Direct Input on the rear panel
+#   "normal"  — power + SWR bargraphs
+#   "vector"  — |Z|, phase, R, X with polar compass
 #
-# (The "peak_avg" view exists in the binary but isn't a default since the
-# meter's Peak-to-Avg mode requires a special audio test tone for any
-# meaningful reading.)
-enabled_views = ["normal", "vector", "dbm", "field_strength"]
+# (The dBm/RL, Direct Input (FS), and Peak-to-Avg views were removed
+# because the LP-100A's serial Power and dBm fields can read 0 / noise-
+# floor even while the LCD shows real measurements — making those
+# views unreliable.)
+enabled_views = ["normal", "vector"]

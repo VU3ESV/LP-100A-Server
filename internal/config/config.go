@@ -38,18 +38,17 @@ type UI struct {
 }
 
 // ValidViews is the set of view names the web client supports rendering.
-// All five of the LP-100A's main display modes are mirrored:
-//   - normal         power + SWR bargraphs
-//   - vector         |Z|, phase, R, X, with polar compass
-//   - dbm            dBm + Return Loss (optional on meter, default off)
-//   - field_strength dBm reading from Direct Input (optional, default off)
-//   - peak_avg       peak/average ratio (optional, default off; client-side rolling window)
+// Only the LP-100A's two always-on display modes are mirrored:
+//   - normal   power + SWR bargraphs
+//   - vector   |Z|, phase, R, X, with polar compass
+//
+// dBm/RL, Direct Input (Field Strength), and Peak-to-Avg are not
+// included — the meter's serial protocol does not reliably report
+// the values those views need (Power and dBm fields can read 0 / noise
+// floor over serial even while the LCD shows real measurements).
 var ValidViews = map[string]bool{
-	"normal":         true,
-	"vector":         true,
-	"dbm":            true,
-	"field_strength": true,
-	"peak_avg":       true,
+	"normal": true,
+	"vector": true,
 }
 
 func defaults() Config {
@@ -66,7 +65,7 @@ func defaults() Config {
 			AllowControl: true,
 		},
 		UI: UI{
-			EnabledViews: []string{"normal", "vector", "dbm", "field_strength"},
+			EnabledViews: []string{"normal", "vector"},
 		},
 	}
 }
@@ -113,7 +112,7 @@ func (c Config) validate() error {
 	}
 	for _, v := range c.UI.EnabledViews {
 		if !ValidViews[v] {
-			return fmt.Errorf("ui.enabled_views: unknown view %q (valid: normal, vector, dbm, field_strength, peak_avg)", v)
+			return fmt.Errorf("ui.enabled_views: unknown view %q (valid: normal, vector)", v)
 		}
 	}
 	return nil
