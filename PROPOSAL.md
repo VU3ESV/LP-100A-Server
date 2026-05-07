@@ -1,6 +1,6 @@
 # Proposal: LP-100A WebSocket Server
 
-**Status:** Draft · **Date:** 2026-05-07 · **Owner:** vinodes4@gmail.com
+**Status:** Implemented (M1–M4 shipped) · **Date:** 2026-05-07 · **Owner:** vinodes4@gmail.com
 
 ## 1. Problem
 
@@ -109,8 +109,8 @@ on server→client frames so clients can detect drops.
     "swr": 1.02,
     "dbm": 61.6,
     "dbw": 31.6,
-    "range": "high",          // high | mid | low
-    "mode": "tune",           // average | peak_hold | tune
+    "range": "high",          // high | mid | low (LP-100A power range)
+    "mode": "tune",           // average | peak_hold | tune (Peak-mode)
     "alarm_setpoint": "2.0",  // off | 1.5 | 2.0 | 2.5 | 3.0 | user
     "alarm_tripped": false,
     "callsign": "N8LP"
@@ -145,36 +145,59 @@ This keeps the protocol stable if the meter firmware ever changes.
 
 ## 5. Configuration
 
-Single config file (TOML), overridable by env vars and CLI flags:
+Single config file (TOML); CLI flags `-config <path>` and `-v` (verbose start).
+The shipped shape (see [`deploy/config.example.toml`](deploy/config.example.toml)):
 
 ```toml
 [serial]
-port = "auto"          # "auto" picks first matching device; or "COM3", "/dev/ttyUSB0"
-baud = 115200
-poll_interval_ms = 100 # 50–250 ms, matches LP-100-VCP's pollrate range
+port             = "/dev/ttyUSB_LPM"  # "auto", "/dev/ttyUSB0", "COM3", etc.
+baud             = 115200
+poll_interval_ms = 100                # 20–1000 ms range; matches LP-100-VCP
 
 [server]
-listen = "0.0.0.0:8088"  # bind to LAN interface; document the no-auth posture
-heartbeat_ms = 2000
-max_clients = 32
+listen        = "0.0.0.0:8088"
+heartbeat_ms  = 2000
+max_clients   = 32
+allow_control = true                  # set false for a read-only port
 
-[meter]
-power_ranges_w = { high = 750, mid = 125, low = 25 }
+[ui]
+enabled_views = ["normal", "vector"]  # mode-button cycle; see §6
 ```
 
-`port = "auto"` walks the OS device list looking for a USB-serial adapter whose
-VID/PID matches the LP-100A's USB-to-serial chip — useful on Linux/macOS where
+`port = "auto"` walks the OS device list, preferring the udev symlink
+`/dev/ttyUSB_LPM` (installed by `deploy/99-lp100a.rules`) and otherwise
+falling back to the first USB-serial adapter — useful on Linux/macOS where
 the device name shifts between reboots. Manual override always wins.
+
+The default log level is **error** so the systemd journal stays quiet on a Pi.
+Use `-v` to start at debug, or flip it at runtime via `POST /api/log-level`
+(the web client's SETUP overlay has a picker for this).
 
 ## 6. Reference web client (v1)
 
-A static HTML/JS page served from the same Go binary at `/`. Mirrors the
-LP-100-VCP control surface:
+A static HTML/JS page served from the same Go binary at `/`, embedded via
+`go:embed` so the deployable artifact stays a single file. Mirrors the
+LP-100-VCP control surface, narrowed to the two display modes the serial
+protocol can fully drive:
 
-- Big readouts: Power (W + dBW), SWR, Z, Phase
-- Bar/level meters with the same low/mid/high range LEDs the Node-RED flow shows
-- Three buttons: **Alarm Setpoint**, **Mode**, **Peak/Avg/Tune**
-- Connection-state pill (green/yellow/red) driven by heartbeat + `status` frames
+- **Normal** — Power (W) with mode-suffixed unit (`w`/`W`/`T` for
+  Average/Peak Hold/Tune, matching the LP-100A LCD), SWR, range LEDs.
+- **Vector** — |Z|, phase, R, X, with a polar compass.
+- Three buttons: **Alarm Setpoint**, **Mode**, **Peak/Avg/Tune**.
+- Connection-state pill (green/yellow/red) driven by heartbeat + `status` frames.
+- **SETUP overlay** with two operator knobs:
+  - *Re-align web with meter* — picks which of the on-meter Peak-mode states
+    (Average / Peak Hold / Tune) the meter is currently showing, so the web
+    cycle and the LCD stay in lockstep after the meter is power-cycled.
+  - *Server log level* — read/write `/api/log-level` to change verbosity at
+    runtime without restarting the service.
+
+**Removed views.** The original proposal mentioned dBm/RL, Direct Input
+(Field Strength), and Peak-to-Avg modes. They were dropped because the
+LP-100A's serial Power and dBm fields can read 0 / noise floor (~0.8 dBm)
+even while the LCD shows real measurements during TX — Z, phase, and SWR
+remain correct, so Normal and Vector stay accurate. This is a meter-side
+quirk, not a parser bug.
 
 This is the minimum needed to demonstrate fan-out: open the page in two tabs,
 click *Mode* in one, watch both update.
@@ -191,31 +214,33 @@ click *Mode* in one, watch both update.
 
 ## 8. Milestones
 
-1. **M1 — serial parity** *(week 1)*: Go binary that opens the port, polls,
-   parses, and prints snapshots. Validates against the meter on a real cable.
-   No network yet.
-2. **M2 — WS server** *(week 2)*: `/ws` endpoint, snapshot-on-connect, telemetry
-   diff stream, command verbs, heartbeats. Two-tab manual fan-out test passes.
-3. **M3 — reference web client** *(week 3)*: static page bundled into the
-   binary, deployable as a single executable. Smoke test on Windows + Linux
-   (Raspberry Pi).
-4. **M4 — hardening** *(week 4)*: auto-reconnect on the serial side, backoff,
-   metrics endpoint (`/healthz`, `/metrics`), config file + flag handling,
-   release builds for win/linux/darwin amd64+arm64.
+1. **M1 — serial parity** ✅: Go binary opens the port, polls with `P`, parses
+   the 9-field CSV, prints snapshots. Validated against real hardware.
+2. **M2 — WS server** ✅: `/ws` endpoint, snapshot-on-connect, telemetry diff
+   stream with per-field deadbands, command verbs (`alarm_step`/`mode_step`/
+   `peak_toggle`), heartbeats, `allow_control` gate. Two-tab fan-out works.
+3. **M3 — reference web client** ✅: static page embedded via `go:embed`,
+   single-binary deploy. Smoke-tested on macOS dev and Linux (Raspberry Pi).
+4. **M4 — hardening** ✅: serial auto-reconnect with 1s→30s exponential
+   backoff, `/healthz`, TOML config + `-v` flag, runtime log-level via
+   `/api/log-level`, ARM64/ARMv7 cross-compile via `deploy/build-pi.sh`,
+   systemd unit + udev rule + `install.sh` / `redeploy.sh`.
 
-## 9. Open questions
+## 9. Open questions / resolved decisions
 
-- **Does the LP-100A tolerate `P` arriving while it's mid-response?** The
-  Node-RED flow sandwiches outgoing commands through a 30 ms `Interleave` delay
-  node — we should reproduce that conservatism initially and measure.
-- **Callsign field as identity?** The protocol returns a 6-char callsign. If a
-  user runs more than one LP-100A, do we want to multiplex them in one server
-  process, or run one server per meter? v1 assumes one meter; design leaves
-  room for later.
-- **Do we need a read-only mode?** With no auth, anyone on the LAN can step
-  the alarm setpoint. Even without full auth, a config-file flag
-  `allow_control = false` on a per-listener basis would let an operator expose
-  a read-only port for casual viewers. Decide before M2.
+- **`P` mid-response collisions** — resolved by a single-writer serial owner
+  goroutine that interleaves commands between polls and waits 200 ms after
+  any control byte before resuming polling (`drainCommands` in
+  `internal/meter/serial.go`). The `P` poll itself is sent as a bare byte,
+  matching the Node-RED flow that's known-good with this firmware.
+- **Multi-meter support** — still one meter per server process. The callsign
+  field is reported in telemetry but not used for routing; if multi-meter
+  becomes a need, run multiple service instances on different ports.
+- **Read-only mode** — shipped as `server.allow_control = false` in the TOML.
+  When set, control verbs are NACKed with `"control disabled"`.
+- **Display-mode set** — the originally-proposed five views were trimmed to
+  just Normal and Vector (see §6). The serial protocol can't drive the others
+  reliably on this firmware.
 
 ## 10. Out of scope, explicitly
 

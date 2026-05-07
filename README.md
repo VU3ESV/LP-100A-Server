@@ -121,6 +121,22 @@ change:
 
 After editing: `sudo systemctl restart lp100a-server`.
 
+### Logging
+
+The server defaults to **error**-level logging so the systemd journal stays
+quiet. Two ways to turn it up:
+
+- **At start time:** pass `-v` (sets debug). The deployed unit edits this via
+  `systemctl edit lp100a-server` → `ExecStart=/usr/local/bin/lp100a-server -v
+  -config /etc/lp100a-server/config.toml`.
+- **At runtime, no restart:** open the web client, click **SETUP**, and pick a
+  level (ERROR / WARN / INFO / DEBUG). Or hit the API directly:
+  ```sh
+  curl -s http://host:8088/api/log-level
+  curl -s -XPOST http://host:8088/api/log-level -d '{"level":"debug"}'
+  ```
+  The change is in-memory; a restart resets to whatever `-v` produces.
+
 ## Security
 
 **There is no authentication.** Anyone with network access to the listen
@@ -128,10 +144,17 @@ address can read telemetry and issue control commands. This is intentional for
 LAN-only deployment. For remote access use a VPN (Tailscale, WireGuard) and
 keep the listen address bound to the VPN interface or `127.0.0.1`.
 
-## Wire protocol
+## HTTP / WebSocket surface
 
-JSON over WebSocket at `/ws`. See [PROPOSAL.md §4](PROPOSAL.md) for the full
-schema. Smoke test from the command line:
+| Path             | Purpose                                                                   |
+|------------------|---------------------------------------------------------------------------|
+| `/`              | Embedded reference web client                                             |
+| `/ws`            | WebSocket — telemetry stream + control verbs (see [PROPOSAL.md §4](PROPOSAL.md)) |
+| `/healthz`       | `ok\n` — for systemd / monitoring probes                                  |
+| `/api/config`    | `{views, allow_control}` — UI bootstrap                                   |
+| `/api/log-level` | GET / POST the running slog level (`error`/`warn`/`info`/`debug`)         |
+
+Smoke test from the command line:
 
 ```sh
 # requires websocat: brew install websocat / cargo install websocat
@@ -177,4 +200,20 @@ curl -sf http://localhost:8088/healthz && echo OK
 
 # Run in the foreground for debugging (as the lp100a user)
 sudo -u lp100a /usr/local/bin/lp100a-server -config /etc/lp100a-server/config.toml -v
+
+# Bump log verbosity on a running instance without a restart
+curl -s -XPOST http://localhost:8088/api/log-level -d '{"level":"debug"}'
 ```
+
+## Web client
+
+The embedded page mirrors the LP-100A LCD for the **Normal** and **Vector**
+display modes. Power is shown with the meter's own unit suffix — `w`
+(Average), `W` (Peak Hold), `T` (Tune) — so the web view tracks whichever
+Peak-mode the device is in. The mode cycle on the page is driven client-side;
+if it ever drifts from the LCD (e.g. after a meter power-cycle), open
+**SETUP** and click the Peak-mode the meter is actually showing to re-align.
+
+Opening multiple tabs / devices is the point of this server: any control
+button pressed on one client is reflected on every other client within one
+poll cycle.
