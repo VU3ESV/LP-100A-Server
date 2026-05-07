@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,16 +21,18 @@ import (
 
 func main() {
 	configPath := flag.String("config", "/etc/lp100a-server/config.toml", "config file path (missing file is fine; defaults are used)")
-	verbose := flag.Bool("v", false, "verbose logging (debug-level: per-frame trace + operational events)")
+	verbose := flag.Bool("v", false, "verbose logging at start (debug-level); the level can also be changed at runtime via /api/log-level or the web UI's Setup overlay")
 	flag.Parse()
 
-	// Default is error-only to keep the journal quiet during normal use.
-	// Pass -v to see operational events and per-poll trace output.
-	level := slog.LevelError
+	// LevelVar is thread-safe and lets us flip the log level at runtime
+	// (via the /api/log-level endpoint below). Default is error-only;
+	// -v starts at debug.
+	var levelVar slog.LevelVar
+	levelVar.Set(slog.LevelError)
 	if *verbose {
-		level = slog.LevelDebug
+		levelVar.Set(slog.LevelDebug)
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &levelVar}))
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -74,6 +77,36 @@ func main() {
 			"allow_control": cfg.Server.AllowControl,
 		})
 	})
+	mux.HandleFunc("/api/log-level", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]string{"level": slogLevelName(levelVar.Level())})
+		case http.MethodPost:
+			var req struct {
+				Level string `json:"level"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, `{"error":"bad json"}`, http.StatusBadRequest)
+				return
+			}
+			lvl, ok := parseSlogLevel(req.Level)
+			if !ok {
+				http.Error(w, `{"error":"level must be one of: error, warn, info, debug"}`, http.StatusBadRequest)
+				return
+			}
+			prev := levelVar.Level()
+			levelVar.Set(lvl)
+			// Force-log the change at error level so it lands in the
+			// journal regardless of the current level setting.
+			logger.Error("log level changed", "from", slogLevelName(prev), "to", slogLevelName(lvl), "remote", r.RemoteAddr)
+			_ = json.NewEncoder(w).Encode(map[string]string{"level": slogLevelName(lvl)})
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		}
+	})
 	mux.Handle("/", web.StaticHandler())
 
 	srv := &http.Server{
@@ -98,4 +131,31 @@ func main() {
 	shutCtx, sc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer sc()
 	_ = srv.Shutdown(shutCtx)
+}
+
+func slogLevelName(l slog.Level) string {
+	switch {
+	case l <= slog.LevelDebug:
+		return "debug"
+	case l <= slog.LevelInfo:
+		return "info"
+	case l <= slog.LevelWarn:
+		return "warn"
+	default:
+		return "error"
+	}
+}
+
+func parseSlogLevel(s string) (slog.Level, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "debug":
+		return slog.LevelDebug, true
+	case "info":
+		return slog.LevelInfo, true
+	case "warn", "warning":
+		return slog.LevelWarn, true
+	case "error", "err":
+		return slog.LevelError, true
+	}
+	return 0, false
 }

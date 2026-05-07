@@ -547,6 +547,12 @@
         <div class="mode-picker" id="mode-picker"></div>
       </div>
 
+      <div class="sync-box">
+        <h3>Server log level</h3>
+        <p>Change verbosity of the server's journal output at runtime. <strong>error</strong> is the quietest (default); <strong>debug</strong> includes a full per-frame trace. The setting is in-memory and resets to the default on restart.</p>
+        <div class="mode-picker" id="log-level-picker"></div>
+      </div>
+
       <div class="setup-banner">
         Below: read-only reference for the meter's SETUP screens. The
         serial protocol exposes only <code>A</code> / <code>M</code> /
@@ -644,8 +650,45 @@
     if (setupOpen) {
       renderSetupGrid();
       renderModePicker();
+      loadLogLevel();   // populate the picker with current server level
     }
     applyView();
+  }
+
+  // Server log level — read once when SETUP opens; user picks one and we
+  // POST it back. State is server-side memory; resets on service restart.
+  const LOG_LEVELS = ["error", "warn", "info", "debug"];
+  let currentLogLevel = "error";
+  function renderLogLevelPicker() {
+    const el = $("log-level-picker");
+    el.innerHTML = LOG_LEVELS.map(lvl =>
+      `<button data-level="${lvl}" class="${lvl === currentLogLevel ? "active" : ""}">${lvl.toUpperCase()}</button>`
+    ).join("");
+    el.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => setLogLevel(btn.dataset.level));
+    });
+  }
+  async function loadLogLevel() {
+    try {
+      const r = await fetch("/api/log-level", { cache: "no-store" });
+      if (!r.ok) return;
+      const cfg = await r.json();
+      if (LOG_LEVELS.includes(cfg.level)) currentLogLevel = cfg.level;
+    } catch (_) {}
+    renderLogLevelPicker();
+  }
+  async function setLogLevel(level) {
+    try {
+      const r = await fetch("/api/log-level", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level }),
+      });
+      if (!r.ok) return;
+      const cfg = await r.json();
+      if (LOG_LEVELS.includes(cfg.level)) currentLogLevel = cfg.level;
+    } catch (_) {}
+    renderLogLevelPicker();
   }
 
   async function loadConfig() {
