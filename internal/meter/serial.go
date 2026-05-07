@@ -188,10 +188,15 @@ func (o *Owner) runOnce(ctx context.Context) error {
 	}
 }
 
-// drainCommands writes any queued control bytes with a short interleave delay
-// matching the Node-RED reference flow's 30ms gap. The poll that follows will
-// reflect the new state.
+// drainCommands writes any queued control bytes with a generous post-command
+// delay so the meter can fully process each before the next byte arrives.
+// 30ms (the Node-RED reference's gap) was too tight for the LP-100A's mode
+// cycle — the Peak-to-Avg screen specifically would not appear when 'M' was
+// sent over serial, even though the same physical button press cycles to it.
+// 200ms gives the meter enough quiet time after a control byte for the
+// firmware to update its display before the next 'P' arrives.
 func (o *Owner) drainCommands(port serial.Port) error {
+	const postCommandSettle = 200 * time.Millisecond
 	for {
 		select {
 		case cmd := <-o.commands:
@@ -199,7 +204,7 @@ func (o *Owner) drainCommands(port serial.Port) error {
 				return fmt.Errorf("write cmd %c: %w", byte(cmd), err)
 			}
 			o.logger.Debug("sent command", "cmd", string(byte(cmd)))
-			time.Sleep(30 * time.Millisecond)
+			time.Sleep(postCommandSettle)
 		default:
 			return nil
 		}
