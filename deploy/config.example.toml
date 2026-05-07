@@ -1,0 +1,21 @@
+# LP-100A Server configuration. Install at /etc/lp100a-server/config.toml.
+
+[serial]
+# Path to the LP-100A serial device.
+#   Linux:   /dev/ttyUSB0  (or /dev/ttyUSB_LPM with the udev rule below)
+#   Windows: COM3
+#   macOS:   /dev/cu.usbserial-XXXX
+# Use "auto" to scan for the first USB-serial adapter (or the udev symlink).
+port             = "/dev/ttyUSB_LPM"
+baud             = 115200
+poll_interval_ms = 100   # 50–250 ms; matches the LP-100-VCP pollrate range
+
+[server]
+# IMPORTANT: this server has NO authentication. Bind it to a LAN interface
+# only; anyone who can reach it can issue control commands. For untrusted
+# networks, front it with a VPN (Tailscale, WireGuard) or set
+# allow_control = false to expose a read-only port.
+listen        = "0.0.0.0:8088"
+heartbeat_ms  = 2000
+max_clients   = 32
+allow_control = true

@@ -1,0 +1,17 @@
+# Stable device name for the LP-100A USB-serial adapter.
+#
+# Plug the meter in and run:
+#   udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial' | head
+# Then edit the values below to match. Most LP-100A units ship with an FTDI
+# FT232 chip (0403:6001), so that is the default. If your meter uses a
+# different USB-serial chip (CH340, CP210x, PL2303), change idVendor/idProduct
+# accordingly. To pin to a specific physical meter when more than one is in
+# use, add ATTRS{serial}=="<unit-serial>".
+#
+# After editing:
+#   sudo cp 99-lp100a.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+# Then verify the symlink exists:
+#   ls -l /dev/ttyUSB_LPM
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="ttyUSB_LPM", GROUP="dialout", MODE="0660"

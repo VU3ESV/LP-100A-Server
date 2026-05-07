@@ -1,0 +1,41 @@
+[Unit]
+Description=LP-100A WebSocket Server
+Documentation=https://github.com/anthropics/lp100a-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lp100a
+Group=dialout
+ExecStart=/usr/local/bin/lp100a-server -config /etc/lp100a-server/config.toml
+Restart=on-failure
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+
+# Hardening — these don't block serial access because the user is in the
+# dialout group, which owns /dev/ttyUSB*.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Resource limits suitable for a Raspberry Pi.
+LimitNOFILE=4096
+MemoryHigh=128M
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

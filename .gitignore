@@ -1,0 +1,11 @@
+dist/
+*.exe
+.DS_Store
+.idea/
+.vscode/
+*.test
+*.out
+
+# Third-party reference material (vendor binaries, flows under others' licenses).
+# Kept locally for development; not redistributed via this repo.
+.support/

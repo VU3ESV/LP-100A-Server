@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LP-100A</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --border: #2a313c;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #2ea043;
+    --warn: #d29922;
+    --danger: #f85149;
+    --off: #484f58;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); }
+  .dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.reconnecting { background: var(--warn); }
+  .dot.disconnected { background: var(--danger); }
+
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+  .reading { font-size: 36px; font-weight: 600; line-height: 1; }
+  .reading .unit { font-size: 16px; color: var(--muted); margin-left: 6px; }
+  .sub { color: var(--muted); margin-top: 4px; font-size: 12px; }
+
+  .bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width 80ms linear; }
+  .bar.warn > div { background: var(--warn); }
+  .bar.danger > div { background: var(--danger); }
+
+  .leds { display: flex; gap: 12px; }
+  .led {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .led .dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+  .controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+  }
+  button:hover { border-color: #3d4754; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .meta { font-size: 12px; color: var(--muted); }
+  .alarm-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    background: var(--off); color: var(--text); font-size: 12px;
+  }
+  .alarm-pill.tripped { background: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <h1>LP-100A</h1>
+  <div class="status">
+    <span id="callsign" class="meta"></span>
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">connecting…</span>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Power</h2>
+    <div class="reading"><span id="power">--</span><span class="unit">W</span></div>
+    <div class="sub"><span id="dbw">--</span> dBW · <span id="dbm">--</span> dBm</div>
+    <div class="bar"><div id="power-bar"></div></div>
+    <div class="leds" style="margin-top: 8px;">
+      <div class="led"><span class="dot" id="led-low"></span>Low</div>
+      <div class="led"><span class="dot" id="led-mid"></span>Mid</div>
+      <div class="led"><span class="dot" id="led-high"></span>High</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>SWR</h2>
+    <div class="reading"><span id="swr">--</span></div>
+    <div class="sub">Alarm: <span class="alarm-pill" id="alarm-pill">off</span></div>
+    <div class="bar"><div id="swr-bar"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Impedance</h2>
+    <div class="reading"><span id="z">--</span><span class="unit">Ω</span></div>
+    <div class="sub">Phase: <span id="phase">--</span>°</div>
+  </section>
+
+  <section class="card">
+    <h2>Mode</h2>
+    <div class="reading" style="font-size: 24px;"><span id="mode">--</span></div>
+    <div class="sub">Range: <span id="range">--</span></div>
+  </section>
+
+  <section class="controls">
+    <button id="btn-mode" disabled>Mode (M)</button>
+    <button id="btn-alarm" disabled>Alarm Setpoint (A)</button>
+    <button id="btn-peak" disabled>Peak / Avg / Tune (F)</button>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d = 2) => (v === null || v === undefined ? "--" : Number(v).toFixed(d));
+
+  const dot = $("status-dot");
+  const statusText = $("status-text");
+  const buttons = ["btn-mode", "btn-alarm", "btn-peak"].map($);
+  const setStatus = (cls, text) => {
+    dot.className = "dot " + cls;
+    statusText.textContent = text;
+    const enable = cls === "connected";
+    buttons.forEach(b => b.disabled = !enable);
+  };
+
+  const RANGE_MAX = { high: 750, mid: 125, low: 25 };
+  let nextRefId = 1;
+  let ws = null;
+  let backoff = 500;
+
+  function render(d) {
+    $("power").textContent = fmt(d.power_w, 1);
+    $("dbw").textContent = fmt(d.dbw, 1);
+    $("dbm").textContent = fmt(d.dbm, 1);
+    $("swr").textContent = fmt(d.swr, 2);
+    $("z").textContent = d.power_w > 0.1 ? fmt(d.z_ohm, 1) : "--";
+    $("phase").textContent = d.power_w > 0.1 ? fmt(d.phase_deg, 1) : "--";
+    $("mode").textContent = (d.mode || "").replace("_", " ");
+    $("range").textContent = d.range || "--";
+    $("callsign").textContent = d.callsign || "";
+
+    const max = RANGE_MAX[d.range] || 750;
+    const pct = Math.min(100, (d.power_w / max) * 100);
+    $("power-bar").style.width = pct + "%";
+    const pbar = $("power-bar").parentElement;
+    pbar.classList.toggle("warn", pct > 80);
+    pbar.classList.toggle("danger", pct > 95);
+
+    const swrPct = Math.min(100, ((d.swr - 1) / 4) * 100);
+    $("swr-bar").style.width = swrPct + "%";
+    const sbar = $("swr-bar").parentElement;
+    sbar.classList.toggle("warn", d.swr >= 1.5 && d.swr < 2);
+    sbar.classList.toggle("danger", d.swr >= 2);
+
+    $("led-low").classList.toggle("on", d.range === "low");
+    $("led-mid").classList.toggle("on", d.range === "mid");
+    $("led-high").classList.toggle("on", d.range === "high");
+
+    const pill = $("alarm-pill");
+    pill.textContent = d.alarm_setpoint || "off";
+    pill.classList.toggle("tripped", !!d.alarm_tripped);
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+  }
+  const command = (action) => send({ type: "command", id: String(nextRefId++), action });
+
+  $("btn-mode").addEventListener("click", () => command("mode_step"));
+  $("btn-alarm").addEventListener("click", () => command("alarm_step"));
+  $("btn-peak").addEventListener("click", () => command("peak_toggle"));
+
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${proto}//${location.host}/ws`;
+    setStatus("reconnecting", "connecting…");
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      backoff = 500;
+      setStatus("connected", "connected");
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "telemetry" && msg.data) render(msg.data);
+      } catch (_) {}
+    };
+    ws.onclose = () => {
+      setStatus("disconnected", `reconnecting in ${Math.round(backoff/1000)}s`);
+      setTimeout(connect, backoff);
+      backoff = Math.min(backoff * 2, 10000);
+    };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>
