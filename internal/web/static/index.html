@@ -351,6 +351,151 @@
   button.key:active:not(:disabled) { transform: translateY(1px); }
   button.key:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* ----- FIELD STRENGTH view ---------------------------------------------*/
+  .fs-stack { display: flex; flex-direction: column; gap: 14px; }
+  .fs-readout {
+    text-align: center;
+    padding: 8px 0 14px;
+    border-bottom: 1px dashed #1f2a35;
+  }
+  .fs-readout .v {
+    color: var(--power);
+    font: 700 56px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px var(--power-glow);
+    letter-spacing: -1px;
+  }
+  .fs-readout .u {
+    color: var(--label);
+    font-size: 16px;
+    margin-left: 6px;
+  }
+  .fs-readout .lin {
+    color: var(--label);
+    font-size: 12px;
+    margin-top: 6px;
+    letter-spacing: 0.6px;
+  }
+  .fs-track {
+    position: relative;
+    height: 14px;
+    background: var(--grid);
+    border: 1px solid #000; border-radius: 3px;
+    overflow: hidden;
+  }
+  .fs-track > .fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+    background: linear-gradient(90deg, #0aa088 0%, var(--bar) 100%);
+    box-shadow: 0 0 8px var(--bar-glow);
+    transition: width 120ms linear;
+  }
+  .fs-ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 4px;
+    color: var(--tick);
+    font-size: 10px; font-variant-numeric: tabular-nums;
+  }
+  .fs-note {
+    color: var(--label);
+    font-size: 11px;
+    line-height: 1.5;
+    border-left: 2px solid rgba(241,196,15,0.4);
+    padding: 6px 12px;
+    background: rgba(241,196,15,0.04);
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ----- PEAK / AVG view --------------------------------------------------*/
+  .pkavg-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .pkavg-cell {
+    border: 1px dashed #1f2a35;
+    border-radius: 6px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .pkavg-cell .lbl {
+    color: var(--label);
+    font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase;
+  }
+  .pkavg-cell .val {
+    color: var(--accent);
+    font: 700 26px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    margin-top: 6px;
+  }
+  .pkavg-cell .val.amber  { color: var(--power); text-shadow: 0 0 12px var(--power-glow); }
+  .pkavg-cell .val.bright { color: var(--swr-fg); text-shadow: 0 0 8px var(--swr-glow); }
+  .pkavg-cell .u {
+    color: var(--label); font-size: 12px; margin-left: 4px;
+  }
+
+  /* ----- SETUP view -------------------------------------------------------*/
+  .setup-banner {
+    background: rgba(241,196,15,0.08);
+    border: 1px solid rgba(241,196,15,0.3);
+    color: var(--yellow);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 11px; line-height: 1.5;
+    letter-spacing: 0.4px;
+    margin-bottom: 14px;
+  }
+  .setup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+  .setup-grid::-webkit-scrollbar { width: 8px; }
+  .setup-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+  .setup-grid::-webkit-scrollbar-thumb { background: #1f2a35; border-radius: 4px; }
+  .setup-card {
+    background: rgba(10,14,18,0.7);
+    border: 1px solid #1f2a35;
+    border-radius: 4px;
+    padding: 10px 10px 12px;
+    position: relative;
+  }
+  .setup-card .num {
+    position: absolute;
+    top: 6px; right: 8px;
+    color: var(--tick);
+    font: 10px ui-monospace, monospace;
+  }
+  .ss-screen {
+    background: #050708;
+    border: 1px solid #0e1218;
+    border-radius: 2px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    font: 600 11px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: #43d4a8;
+    letter-spacing: 0.4px;
+    text-shadow: 0 0 4px rgba(67,212,168,0.3);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .ss-line { display: block; }
+  .setup-card h4 {
+    margin: 0 0 4px;
+    font-size: 11px; font-weight: 600;
+    color: var(--swr-fg);
+    letter-spacing: 0.6px;
+  }
+  .setup-card p {
+    margin: 0;
+    color: var(--label);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
   @media (max-width: 540px) {
     .grid { grid-template-columns: 1fr; }
     .readouts { border-left: none; padding-left: 0; align-items: flex-start; text-align: left; }
@@ -358,6 +503,8 @@
     .num-swr { font-size: 26px; margin-top: 10px; }
     .vector-grid { grid-template-columns: 1fr; }
     .compass { margin: 0 auto; }
+    .pkavg-grid { grid-template-columns: 1fr; }
+    .fs-readout .v { font-size: 44px; }
   }
 </style>
 </head>
@@ -487,8 +634,68 @@
       </div>
     </div>
 
+    <!-- ============= FIELD STRENGTH ============= -->
+    <div class="view" data-view="field_strength">
+      <div class="fs-stack">
+        <div class="fs-readout">
+          <div><span class="v" id="fs-dbm">--</span><span class="u">dBm</span></div>
+          <div class="lin">linear: <span id="fs-lin">--</span></div>
+        </div>
+        <div class="fs-track"><div class="fill" id="fs-bar"></div></div>
+        <div class="fs-ticks">
+          <span>−15 dBm</span><span>0</span><span>+15</span><span>+33 dBm</span>
+        </div>
+        <div class="fs-note">
+          Calibrated field strength uses the meter's <strong>Direct Input</strong>
+          jacks on the rear panel, not the couplers. Range is −15 to +33 dBm
+          (max input 2 W). To use this mode, enable
+          <em>Direct Input (FS)</em> in the meter's SETUP → Opt. Mode Display
+          and feed signal directly to the rear-panel input.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============= PEAK / AVG / RATIO ============= -->
+    <div class="view" data-view="peak_avg">
+      <div class="pkavg-grid">
+        <div class="pkavg-cell">
+          <div class="lbl">Peak</div>
+          <div class="val amber"><span id="pk-peak">--</span><span class="u">W</span></div>
+        </div>
+        <div class="pkavg-cell">
+          <div class="lbl">Average</div>
+          <div class="val bright"><span id="pk-avg">--</span><span class="u">W</span></div>
+        </div>
+        <div class="pkavg-cell">
+          <div class="lbl">Ratio</div>
+          <div class="val"><span id="pk-ratio">--</span><span class="u">dB</span></div>
+        </div>
+      </div>
+      <div class="fs-note">
+        Peak / Average / Ratio derived <strong>client-side</strong> over a
+        rolling 2-second window of samples. The meter itself reports a single
+        power value per poll; peak ≈ max(window), avg ≈ mean(window),
+        ratio = 10·log₁₀(peak / avg). Indicates speech-processing
+        compression — <em>higher ratio = less compression</em>.
+      </div>
+    </div>
+
+    <!-- ============= SETUP REFERENCE ============= -->
+    <div class="view" data-view="setup">
+      <div class="setup-banner">
+        Read-only reference. The LP-100A serial protocol only exposes
+        <code>A</code> / <code>M</code> / <code>F</code> / <code>P</code>;
+        there is no remote-setup command. To change any of these,
+        press &amp; hold <strong>Mode</strong> on the physical meter for
+        ≈1&nbsp;s, then use Mode (next) / Alarm-Dn (lower) /
+        Peak-Up (raise).
+      </div>
+      <div class="setup-grid" id="setup-grid"></div>
+    </div>
+
     <div class="screen-foot">
       <span class="pill clickable" id="view-pill" title="Click to advance the web view only — re-syncs without sending Mode to the meter">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
+      <span class="pill clickable" id="setup-pill" title="Open the setup reference (read-only)">SETUP · <span class="v" id="setup-pill-state">…</span></span>
       <span class="pill">PWR · <span class="v" id="mode-label">—</span></span>
       <span class="pill">RANGE · <span class="v" id="range-label">—</span></span>
       <span class="pill" id="alarm-pill">ALARM · <span class="v" id="alarm-label">off</span></span>
@@ -521,11 +728,18 @@
   // VIEWS is loaded from /api/config so the cycle matches whichever modes
   // the meter has enabled in its SETUP screen. Default matches the meter's
   // factory configuration (Normal + Vector only). Set the [ui] enabled_views
-  // list in the server config to enable additional views (e.g. dbm).
-  const VIEW_LABELS = { normal: "NORMAL", vector: "VECTOR Z", dbm: "DBM / RL" };
+  // list in the server config to enable additional views.
+  const VIEW_LABELS = {
+    normal:         "NORMAL",
+    vector:         "VECTOR Z",
+    dbm:            "DBM / RL",
+    field_strength: "FIELD STR.",
+    peak_avg:       "PEAK / AVG",
+  };
   const FALLBACK_VIEWS = ["normal", "vector"];
   let VIEWS = FALLBACK_VIEWS.slice();
   let viewIdx = 0;
+  let setupOpen = false;
 
   function loadPersistedViewIdx() {
     const saved = localStorage.getItem("lp100a.viewIdx");
@@ -534,15 +748,28 @@
   }
 
   function applyView() {
-    const name = VIEWS[viewIdx] || "normal";
+    const cycleName = VIEWS[viewIdx] || "normal";
+    const activeName = setupOpen ? "setup" : cycleName;
     document.querySelectorAll(".view").forEach(el => {
-      el.classList.toggle("active", el.dataset.view === name);
+      el.classList.toggle("active", el.dataset.view === activeName);
     });
-    $("screen-title").textContent = "LP-100A · " + (VIEW_LABELS[name] || name.toUpperCase());
-    $("mode-view-label").textContent = VIEW_LABELS[name] || name.toUpperCase();
+    const title = setupOpen ? "SETUP" : (VIEW_LABELS[cycleName] || cycleName.toUpperCase());
+    $("screen-title").textContent = "LP-100A · " + title;
+    $("mode-view-label").textContent = VIEW_LABELS[cycleName] || cycleName.toUpperCase();
+    $("setup-pill-state").textContent = setupOpen ? "EXIT" : "OPEN";
     $("btn-mode-sub").textContent = VIEWS.map(v => (VIEW_LABELS[v] || v).split(" ")[0]).join(" · ");
+    // While setup is open, control buttons are not meaningful.
+    ["btn-mode", "btn-alarm", "btn-peak"].forEach(id => {
+      $(id).disabled = setupOpen || !connected;
+    });
     localStorage.setItem("lp100a.viewIdx", String(viewIdx));
     if (lastData) render(lastData);
+  }
+
+  function toggleSetup() {
+    setupOpen = !setupOpen;
+    if (setupOpen) renderSetupGrid();
+    applyView();
   }
 
   async function loadConfig() {
@@ -564,12 +791,14 @@
   // --- Connection state ---------------------------------------------------
   const dot = $("status-dot");
   const statusText = $("status-text");
-  const buttons = ["btn-mode", "btn-alarm", "btn-peak"].map($);
+  let connected = false;
   const setStatus = (cls, text) => {
     dot.className = "dot " + cls;
     statusText.textContent = text;
-    const enable = cls === "connected";
-    buttons.forEach(b => b.disabled = !enable);
+    connected = (cls === "connected");
+    ["btn-mode", "btn-alarm", "btn-peak"].forEach(id => {
+      $(id).disabled = setupOpen || !connected;
+    });
   };
 
   // --- Range scaling ------------------------------------------------------
@@ -602,9 +831,16 @@
     $("alarm-label").textContent = d.alarm_setpoint || "off";
     $("alarm-pill").classList.toggle("alarm-tripped", !!d.alarm_tripped);
 
-    if (view === "normal") renderNormal(d);
-    else if (view === "vector") renderVector(d);
-    else if (view === "dbm") renderDbm(d);
+    // Always update the rolling window so peak/avg has data when we land on it.
+    pushPkAvgSample(d.power_w);
+
+    if (setupOpen) return;  // setup view is static
+
+    if      (view === "normal")          renderNormal(d);
+    else if (view === "vector")          renderVector(d);
+    else if (view === "dbm")             renderDbm(d);
+    else if (view === "field_strength")  renderFieldStrength(d);
+    else if (view === "peak_avg")        renderPeakAvg(d);
   }
 
   function renderNormal(d) {
@@ -675,6 +911,54 @@
     }
   }
 
+  function renderFieldStrength(d) {
+    // The meter outputs the same 9 fields regardless of mode. In Direct
+    // Input (FS) mode the meter routes the rear-panel input through the
+    // power-to-dBm path, so dBm is what's meaningful here.
+    const dbm = d.dbm;
+    $("fs-dbm").textContent = fmt(dbm, 1);
+    // FS range -15 to +33 dBm; corresponding linear power 32 µW to 2 W.
+    const lin_w = Math.pow(10, (dbm - 30) / 10);
+    let linear;
+    if (lin_w >= 1)        linear = fmt(lin_w, 2) + " W";
+    else if (lin_w >= 0.001) linear = fmt(lin_w * 1000, 1) + " mW";
+    else                   linear = fmt(lin_w * 1e6, 0) + " µW";
+    $("fs-lin").textContent = isFinite(lin_w) ? linear : "--";
+    // Bar maps -15..+33 dBm -> 0..100%
+    const pct = pctClamp(((dbm - (-15)) / (33 - (-15))) * 100);
+    $("fs-bar").style.width = pct + "%";
+  }
+
+  // Rolling window for Peak/Avg view (and any future analytics).
+  const PK_AVG_WINDOW_MS = 2000;
+  const pkAvgWindow = []; // [{ts, p}]
+  function pushPkAvgSample(p) {
+    if (typeof p !== "number" || Number.isNaN(p)) return;
+    const now = performance.now();
+    pkAvgWindow.push({ ts: now, p });
+    while (pkAvgWindow.length && now - pkAvgWindow[0].ts > PK_AVG_WINDOW_MS) {
+      pkAvgWindow.shift();
+    }
+  }
+  function renderPeakAvg() {
+    if (pkAvgWindow.length === 0) {
+      $("pk-peak").textContent = "--";
+      $("pk-avg").textContent  = "--";
+      $("pk-ratio").textContent = "--";
+      return;
+    }
+    let peak = 0, sum = 0;
+    for (const s of pkAvgWindow) {
+      if (s.p > peak) peak = s.p;
+      sum += s.p;
+    }
+    const avg = sum / pkAvgWindow.length;
+    const ratio = avg > 0.01 ? 10 * Math.log10(peak / Math.max(avg, 1e-6)) : 0;
+    $("pk-peak").textContent  = fmt(peak, 1);
+    $("pk-avg").textContent   = fmt(avg, 1);
+    $("pk-ratio").textContent = fmt(ratio, 1);
+  }
+
   function renderDbm(d) {
     $("dbm-dbm").textContent = fmt(d.dbm, 1);
     $("dbm-w").textContent   = fmt(d.power_w, 1);
@@ -692,6 +976,86 @@
     // RL bar: 0 dB (worst) to 40 dB (excellent), full bar at 40 dB
     const rlPct = isFinite(rl) ? pctClamp((rl / 40) * 100) : 100;
     $("rl-bar").style.width = rlPct + "%";
+  }
+
+  // ---------------------------------------------------------------------
+  // Setup reference (read-only mirror of the LP-100A's SETUP screens).
+  // Source: LP-100A Quick Start Guide v4.1 (telepostinc.com/LP-100A-Quick-Start.pdf).
+  // The serial protocol does not expose these settings or allow remote
+  // changes — the user has to press & hold Mode on the physical meter.
+  const SETUP_SCREENS = [
+    { name: "Reference Screen",
+      lcd: ["Re 1.82  AGC .684 78F", "AL:Reset  FS:TempF/C"],
+      desc: "Reference voltage from the gain/phase detector, RSSI from the frequency-counter preamp, and temperature. Dn resets the microprocessor. Up toggles °F / °C." },
+    { name: "User Alarm Setting",
+      lcd: ["User Alarm Setting", "       3.5"],
+      desc: "User-defined SWR alarm setpoint. Range 1.0–5.0 in 0.1 steps. Used when Alarm cycles to the \"User\" position." },
+    { name: "AL Thresh / Pwr Mode",
+      lcd: ["AL Thresh   Pwr Mode", "000.0W      Net"],
+      desc: "SWR-alarm power threshold (0, 0.1, 1.0, 10.0, 100.0 W) and the power display mode: Net (Fwd − Ref) or Fwd. Default: Net, threshold 0 W (alarm active at all powers)." },
+    { name: "Range / Scale Max",
+      lcd: ["CH1 Range  Scale Max", "High         1500W"],
+      desc: "Maximum bargraph scale per range. Set Low / Mid / High independently. Defaults: 15 / 100 / 1500 W. Scaled ×1.67 with a 5 kW coupler, ×3.33 with 10 kW." },
+    { name: "Bargraph Tuning Range",
+      lcd: ["Bargraph Tuning Range", "        12 dB"],
+      desc: "Width of the bargraph in Average and Tune modes (dB below max). Used to optimize bargraph resolution while tuning. Peak mode is fixed at 13 dB." },
+    { name: "Avg. Samples PWR / SWR",
+      lcd: ["Avg. Samples PWR  SWR", "           8    2"],
+      desc: "Sample count for the numeric power and SWR readouts. Power: 2–24 samples; SWR: 0–5. Defaults: 8 and 2. Higher = smoother but slower." },
+    { name: "Peak Hold Time",
+      lcd: ["Peak Hold Time", "      2.00 sec"],
+      desc: "Hold time for peak-mode readings before they decay. Range 0.25–5.0 s. Default 2.0 s — good for SSB or CW." },
+    { name: "Bargraph Decay",
+      lcd: ["Bargraph Decay", "        Med"],
+      desc: "Decay rate of the bargraphs. Choices: Fast / Med / Slow (≈3 s). Slow smooths the response considerably for SSB. Default Med. Attack is always fast." },
+    { name: "Coupler Type",
+      lcd: ["CH1   Coupler Type", "LPC1 3KW 1.8-54 MHz"],
+      desc: "Selects max power and frequency range of the installed coupler. Choices: LPC1 / LPC2 / LPC3 / LPC4 / LPC5 / LPC6. Different couplers can be intermixed across CH1/CH2." },
+    { name: "SWR Resting Style",
+      lcd: ["SWR Resting Style", "      < -.-- >"],
+      desc: "How SWR is displayed when not transmitting. Choices: \"-.--\", \"1.00\", \". . . .\", blank, hold-last. Hold-last resets when you transmit again." },
+    { name: "Lower Bargraph Mode",
+      lcd: ["Lower Bargraph Mode", "    >SWR    REF"],
+      desc: "What the lower bargraph shows: SWR or Reflected Power. With Reflected Power, the reference depends on the AL Thresh power-mode setting (Net or Fwd)." },
+    { name: "Letter Pos'n / Callsign",
+      lcd: ["Ltr Pos'n   Callsign", "    1         N8LP"],
+      desc: "Per-character editor for the screen-saver callsign (6 chars). Dn picks the position 1–6; Up scrolls 0–9, A–Z, space, /, −. Wraps both directions." },
+    { name: "Display Brightness",
+      lcd: ["Display Brightness", "Dim ----+--- Bright"],
+      desc: "8 levels in 12.5 % steps. Default: 6 (≈75 %). Display is rated 50 000 hrs at full brightness; lower = longer life. Adjusts live as you scroll." },
+    { name: "SS Timers — Minutes",
+      lcd: ["SS Timers - Minutes", "Scroll=02   Sleep= 05"],
+      desc: "Screen-saver scroll start and sleep timers, in minutes. 0–10 each. The scroll timer must fire before the sleep timer. There's also a fixed 1-second post-TX dim." },
+    { name: "SS Reset Mode",
+      lcd: ["SS Reset Mode", "Mode Button or RF Sense"],
+      desc: "How the meter wakes from screen-saver / sleep. Choices: Mode Button or RF Sense / Mode Button only. Useful in 24/7 monitoring stations to reduce display wear." },
+    { name: "Opt. Mode Display",
+      lcd: ["Opt. Mode Display", "dBm / RL         On"],
+      desc: "Enable / disable the optional display modes: dBm/RL, Direct Input (FS), Peak-to-Average. All disabled by default. The web client should mirror these in [ui] enabled_views." },
+    { name: "SWR Power Threshold",
+      lcd: ["SWR Power Threshold", "       0.50W"],
+      desc: "Lower limit for SWR display. Choices: 0.05 / 0.5 / 2.0 / 5.0 / 10.0 W. Higher values ignore noisy low-power samples (e.g. between syllables) and smooth the SWR display." },
+    { name: "Pk. Tmr Reset Threshold",
+      lcd: ["Pk. Tmr Reset Threshold", "  50 Percent of Peak"],
+      desc: "How far below the peak power must drop before the peak-hold timer resets and grabs a new sample. Default 10 %. Useful for SSB peak tracking." },
+    { name: "Dual Coupler Option",
+      lcd: ["Dual Coupler Option", "    Not Installed"],
+      desc: "Enable / disable the dual-coupler feature. \"Installed\" reveals the up/down arrows that show which coupler is active. Most users keep this Off." },
+  ];
+
+  function renderSetupGrid() {
+    const grid = $("setup-grid");
+    if (grid.children.length > 0) return; // render once
+    grid.innerHTML = SETUP_SCREENS.map((s, i) => {
+      const lines = s.lcd.map(l => `<span class="ss-line">${l}</span>`).join("");
+      return `
+        <div class="setup-card">
+          <span class="num">${String(i+1).padStart(2,"0")} / ${SETUP_SCREENS.length}</span>
+          <div class="ss-screen">${lines}</div>
+          <h4>${s.name}</h4>
+          <p>${s.desc}</p>
+        </div>`;
+    }).join("");
   }
 
   // Decay loop for sticky peaks (only meaningful in Normal view).
@@ -728,11 +1092,15 @@
 
   // VIEW pill: advance the web view WITHOUT sending Mode to the meter.
   // Use this if the meter and web get out of sync (e.g. after restart, or
-  // if someone presses Mode on the physical device).
+  // if someone presses Mode on the physical device). No-op in setup view.
   $("view-pill").addEventListener("click", () => {
+    if (setupOpen) return;
     viewIdx = (viewIdx + 1) % VIEWS.length;
     applyView();
   });
+
+  // SETUP pill: toggles the read-only setup reference panel.
+  $("setup-pill").addEventListener("click", toggleSetup);
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
