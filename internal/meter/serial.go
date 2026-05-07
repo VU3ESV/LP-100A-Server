@@ -139,12 +139,10 @@ func (o *Owner) runOnce(ctx context.Context) error {
 			if err := o.drainCommands(port); err != nil {
 				return err
 			}
-			// Formal protocol query is `;P?` (semicolon-prefixed,
-			// question-mark-suffixed), as used by the LP-100-VCP from
-			// Telepost. Bare `P` partially worked but appears to leave
-			// some response fields stale (e.g. dBm) on some firmware
-			// revisions when the meter is in non-default display modes.
-			if _, err := port.Write([]byte(";P?")); err != nil {
+			// Single-byte 'P' poll, matching the Node-RED reference flow
+			// that's known to work with this meter's firmware. Don't
+			// "improve" this without testing on real hardware first.
+			if _, err := port.Write([]byte{'P'}); err != nil {
 				return fmt.Errorf("write poll: %w", err)
 			}
 			line = line[:0]
@@ -193,23 +191,19 @@ func (o *Owner) runOnce(ctx context.Context) error {
 	}
 }
 
-// drainCommands writes any queued control bytes using the formal protocol
-// form `;<cmd>?` (matching the LP-100-VCP application from Telepost).
-// 30ms (the Node-RED reference's gap) was too tight for the LP-100A's mode
-// cycle — Peak-to-Avg specifically would not appear when 'M' was sent over
-// serial, even though the same physical button press cycles to it. 200ms
-// gives the meter enough quiet time for the firmware to update its display
-// before the next ';P?' arrives.
+// drainCommands writes any queued single-byte control characters with a
+// generous post-command delay so the meter can fully process each before
+// the next byte arrives. 200ms is enough headroom for the LP-100A's mode
+// cycle (including the Peak-to-Avg screen) to settle between bytes.
 func (o *Owner) drainCommands(port serial.Port) error {
 	const postCommandSettle = 200 * time.Millisecond
 	for {
 		select {
 		case cmd := <-o.commands:
-			frame := []byte{';', byte(cmd), '?'}
-			if _, err := port.Write(frame); err != nil {
+			if _, err := port.Write([]byte{byte(cmd)}); err != nil {
 				return fmt.Errorf("write cmd %c: %w", byte(cmd), err)
 			}
-			o.logger.Debug("sent command", "cmd", string(byte(cmd)), "wire", string(frame))
+			o.logger.Debug("sent command", "cmd", string(byte(cmd)))
 			time.Sleep(postCommandSettle)
 		default:
 			return nil
