@@ -110,7 +110,7 @@ on server→client frames so clients can detect drops.
     "dbm": 61.6,
     "dbw": 31.6,
     "range": "high",          // high | mid | low
-    "mode": "fast",           // average | peak_hold | fast
+    "mode": "tune",           // average | peak_hold | tune
     "alarm_setpoint": "2.0",  // off | 1.5 | 2.0 | 2.5 | 3.0 | user
     "alarm_tripped": false,
     "callsign": "N8LP"

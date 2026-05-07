@@ -19,7 +19,7 @@ type Snapshot struct {
 	DBm           float64   `json:"dbm"`
 	DBW           float64   `json:"dbw"`
 	Range         string    `json:"range"`          // high | mid | low
-	Mode          string    `json:"mode"`           // average | peak_hold | fast
+	Mode          string    `json:"mode"`           // average | peak_hold | tune
 	AlarmSetpoint string    `json:"alarm_setpoint"` // off | 1.5 | 2.0 | 2.5 | 3.0 | user
 	AlarmTripped  bool      `json:"alarm_tripped"`
 	Callsign      string    `json:"callsign"`
@@ -27,7 +27,7 @@ type Snapshot struct {
 
 var (
 	rangeNames = map[byte]string{'0': "high", '1': "mid", '2': "low"}
-	modeNames  = map[byte]string{'0': "average", '1': "peak_hold", '2': "fast"}
+	modeNames  = map[byte]string{'0': "average", '1': "peak_hold", '2': "tune"}
 	alarmNames = map[byte]string{'0': "off", '1': "1.5", '2': "2.0", '3': "2.5", '4': "3.0", '5': "user"}
 )
 

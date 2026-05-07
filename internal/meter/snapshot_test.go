@@ -32,8 +32,8 @@ func TestParseExampleFrame(t *testing.T) {
 	if s.Range != "high" {
 		t.Errorf("Range: got %q want high", s.Range)
 	}
-	if s.Mode != "fast" {
-		t.Errorf("Mode: got %q want fast", s.Mode)
+	if s.Mode != "tune" {
+		t.Errorf("Mode: got %q want tune", s.Mode)
 	}
 	if !near(s.DBm, 61.6) {
 		t.Errorf("DBm: got %v want 61.6", s.DBm)
