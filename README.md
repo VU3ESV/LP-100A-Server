@@ -117,7 +117,7 @@ change:
 | `server.listen`             | `0.0.0.0:8088`       | Bind to a LAN IP for safety                      |
 | `server.allow_control`      | `true`               | Set `false` for a read-only port                 |
 | `server.max_clients`        | `32`                 |                                                  |
-| `ui.enabled_views`          | all five             | Views available on the web's `VIEW` pill: `normal`, `vector`, `dbm`, `field_strength`, `peak_avg`. The web view is independent of the meter's mode; the Mode button on the web only cycles the meter's LCD. |
+| `ui.enabled_views`          | all five             | Web Mode-button cycle order: `normal`, `vector`, `dbm`, `field_strength`, `peak_avg`. Must match the modes enabled in the meter's SETUP → Opt. Mode Display so both stay in lockstep. The web's SETUP overlay has a re-alignment picker for initial-state mismatch. |
 
 After editing: `sudo systemctl restart lp100a-server`.
 

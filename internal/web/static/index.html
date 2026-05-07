@@ -435,6 +435,50 @@
   }
 
   /* ----- SETUP view -------------------------------------------------------*/
+  .sync-box {
+    border: 1px solid #1f2a35;
+    background: rgba(24,212,179,0.04);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .sync-box h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .sync-box p {
+    margin: 0 0 10px;
+    color: var(--label);
+    font-size: 12px; line-height: 1.5;
+  }
+  .mode-picker {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .mode-picker button {
+    appearance: none;
+    background: linear-gradient(180deg, #1f262e 0%, #131820 100%);
+    color: var(--swr-fg);
+    border: 1px solid #2a323c;
+    border-radius: 4px;
+    padding: 8px 14px;
+    font: 600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .mode-picker button:hover {
+    background: linear-gradient(180deg, #25303a 0%, #161c25 100%);
+  }
+  .mode-picker button.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 8px rgba(24,212,179,0.25) inset;
+  }
+
   .setup-banner {
     background: rgba(241,196,15,0.08);
     border: 1px solid rgba(241,196,15,0.3);
@@ -682,20 +726,26 @@
 
     <!-- ============= SETUP REFERENCE ============= -->
     <div class="view" data-view="setup">
+      <div class="sync-box">
+        <h3>Re-align web with meter</h3>
+        <p>The Mode button advances the meter's LCD <em>and</em> the web display together. If they get out of sync (after restart, or if someone presses the physical Mode button), tell the web what the meter is actually showing now:</p>
+        <div class="mode-picker" id="mode-picker"></div>
+      </div>
+
       <div class="setup-banner">
-        Read-only reference. The LP-100A serial protocol only exposes
-        <code>A</code> / <code>M</code> / <code>F</code> / <code>P</code>;
-        there is no remote-setup command. To change any of these,
-        press &amp; hold <strong>Mode</strong> on the physical meter for
-        ≈1&nbsp;s, then use Mode (next) / Alarm-Dn (lower) /
-        Peak-Up (raise).
+        Below: read-only reference for the meter's SETUP screens. The
+        serial protocol exposes only <code>A</code> / <code>M</code> /
+        <code>F</code> / <code>P</code>; there's no remote-setup command.
+        To change any of these, press &amp; hold <strong>Mode</strong>
+        on the physical meter for ≈1&nbsp;s, then use Mode (next) /
+        Alarm-Dn (lower) / Peak-Up (raise).
       </div>
       <div class="setup-grid" id="setup-grid"></div>
     </div>
 
     <div class="screen-foot">
-      <span class="pill clickable" id="view-pill" title="Click to cycle the web display. (The meter LCD is cycled by the Mode button, separately.)">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
-      <span class="pill clickable" id="setup-pill" title="Open the setup reference (read-only)">SETUP · <span class="v" id="setup-pill-state">…</span></span>
+      <span class="pill">MODE · <span class="v" id="mode-view-label">NORMAL</span></span>
+      <span class="pill clickable" id="setup-pill" title="Open the setup reference">SETUP · <span class="v" id="setup-pill-state">…</span></span>
       <span class="pill">PWR · <span class="v" id="mode-label">—</span></span>
       <span class="pill">RANGE · <span class="v" id="range-label">—</span></span>
       <span class="pill" id="alarm-pill">ALARM · <span class="v" id="alarm-label">off</span></span>
@@ -757,9 +807,9 @@
     $("screen-title").textContent = "LP-100A · " + title;
     $("mode-view-label").textContent = VIEW_LABELS[cycleName] || cycleName.toUpperCase();
     $("setup-pill-state").textContent = setupOpen ? "EXIT" : "OPEN";
-    // Mode button is a remote control for the meter LCD only; it does not
-    // change the web view. Web view is selected via the VIEW pill.
-    $("btn-mode-sub").textContent = "Cycles meter LCD";
+    // Mode button shows the currently-tracked meter mode as its subtitle.
+    // Pressing the button advances both the meter LCD (via 'M') and this.
+    $("btn-mode-sub").textContent = VIEW_LABELS[cycleName] || cycleName.toUpperCase();
     // While setup is open, control buttons are not meaningful.
     ["btn-mode", "btn-alarm", "btn-peak"].forEach(id => {
       $(id).disabled = setupOpen || !connected;
@@ -770,7 +820,10 @@
 
   function toggleSetup() {
     setupOpen = !setupOpen;
-    if (setupOpen) renderSetupGrid();
+    if (setupOpen) {
+      renderSetupGrid();
+      renderModePicker();
+    }
     applyView();
   }
 
@@ -1083,25 +1136,36 @@
   }
   const command = (action) => send({ type: "command", id: String(nextRefId++), action });
 
-  // Mode button cycles the METER's LCD only (sends 'M' over serial). It does
-  // NOT advance the web view — the serial protocol can't tell us what mode
-  // the meter ends up in, so any auto-cycle on the web side would just drift
-  // out of sync. The user picks the web view explicitly via the VIEW pill.
-  $("btn-mode").addEventListener("click", () => command("mode_step"));
-  $("btn-alarm").addEventListener("click", () => command("alarm_step"));
-  $("btn-peak").addEventListener("click",  () => command("peak_toggle"));
-
-  // VIEW pill: advance the web display through the configured views. Does
-  // NOT send Mode to the meter. Use this to pick what the web shows; use
-  // the Mode button to step the meter's LCD. No-op in setup view.
-  $("view-pill").addEventListener("click", () => {
-    if (setupOpen) return;
+  // Mode button advances BOTH the meter's LCD (via serial 'M') and the web
+  // display in lockstep. The serial protocol gives us no way to query the
+  // meter's mode, so the web tracks it by counting M presses we sent — the
+  // initial offset (the meter remembers its mode in NVRAM, the web boots on
+  // Normal) is fixable from the SETUP overlay's "Re-align web with meter"
+  // picker, which lets the user tell the web what the meter currently shows.
+  $("btn-mode").addEventListener("click", () => {
+    command("mode_step");
     viewIdx = (viewIdx + 1) % VIEWS.length;
     applyView();
   });
+  $("btn-alarm").addEventListener("click", () => command("alarm_step"));
+  $("btn-peak").addEventListener("click",  () => command("peak_toggle"));
 
-  // SETUP pill: toggles the read-only setup reference panel.
+  // SETUP pill: toggles the read-only setup reference panel + alignment picker.
   $("setup-pill").addEventListener("click", toggleSetup);
+
+  function renderModePicker() {
+    const el = $("mode-picker");
+    el.innerHTML = VIEWS.map((v, i) =>
+      `<button data-idx="${i}" class="${i === viewIdx ? "active" : ""}">${VIEW_LABELS[v] || v.toUpperCase()}</button>`
+    ).join("");
+    el.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        viewIdx = parseInt(btn.dataset.idx, 10) || 0;
+        applyView();           // updates view + main Mode button label
+        renderModePicker();    // refresh the active highlight
+      });
+    });
+  }
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";

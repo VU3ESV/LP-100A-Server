@@ -26,9 +26,13 @@ type Server struct {
 	AllowControl bool   `toml:"allow_control"`
 }
 
-// UI controls which views the web client offers in its VIEW-pill cycle.
-// This is independent of the meter's display mode: the Mode button on the
-// web only cycles the meter's LCD; the VIEW pill cycles the web display.
+// UI controls which web views are part of the Mode-button cycle. The
+// list MUST match (in order) the modes the meter cycles through in its
+// "Opt. Mode Display" SETUP screen, otherwise the web view and the
+// meter LCD will drift apart after a few presses. Default enables all
+// five; trim the list (or re-order it) to match a non-default meter
+// configuration. The setup overlay in the web UI provides a one-click
+// re-alignment picker for handling initial-state mismatch.
 type UI struct {
 	EnabledViews []string `toml:"enabled_views"`
 }

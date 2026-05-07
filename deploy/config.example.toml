@@ -21,9 +21,10 @@ max_clients   = 32
 allow_control = true
 
 [ui]
-# Which web display modes are available via the VIEW pill on the web client.
-# This is INDEPENDENT of the meter's mode — the Mode button on the web only
-# cycles the LP-100A's LCD, it does not change the web view.
+# Web Mode-button cycle order. MUST match the modes the meter cycles
+# through in its "Opt. Mode Display" SETUP screen, otherwise the web view
+# and the LP-100A's LCD will drift after each press of Mode. The web has
+# a re-alignment picker in the SETUP overlay if they get out of sync.
 #
 #   "normal"          — power + SWR bargraphs (always enabled on the meter)
 #   "vector"          — |Z|, phase, R, X with polar compass (always enabled)
@@ -31,6 +32,6 @@ allow_control = true
 #   "field_strength"  — dBm via Direct Input on the rear panel
 #   "peak_avg"        — Peak / Avg / ratio derived client-side over 2 s window
 #
-# Default enables all five web views; trim the list to limit what the VIEW
-# pill cycles through.
+# Default enables all five (matches the LP-100A factory state when all
+# optional modes are turned on in SETUP). Trim or re-order to match.
 enabled_views = ["normal", "vector", "dbm", "field_strength", "peak_avg"]
