@@ -88,7 +88,6 @@ After the first install, push subsequent changes from your dev machine with
 ```sh
 ./deploy/redeploy.sh pi@raspberrypi.local           # rebuild, scp, restart
 ./deploy/redeploy.sh pi@host --service              # also push systemd unit
-./deploy/redeploy.sh pi@host --udev                 # also push udev rule
 ./deploy/redeploy.sh pi@host --restart-only         # skip build; just bounce the service
 ARCH=arm ./deploy/redeploy.sh pi@host               # 32-bit ARMv7 target
 ```
@@ -97,6 +96,10 @@ The script cross-compiles, scp's the binary into `/tmp/` on the Pi, stops the
 service, swaps the binary atomically with `install`, restarts, tails the last
 few journal lines, and finally hits `/healthz`. It needs SSH key auth and
 passwordless sudo (the Raspberry Pi OS default).
+
+Redeploy deliberately **does not touch** `/etc/lp100a-server/config.toml` or
+`/etc/udev/rules.d/99-lp100a.rules` — those are operator-managed. To change
+either, edit the file on the Pi directly, or re-run `install.sh`.
 
 ## Configuration
 
