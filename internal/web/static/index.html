@@ -120,7 +120,14 @@
     font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
   }
   .bar-row .lbl { width: 32px; color: var(--accent); font-weight: 600; }
-  .bar-row .val { margin-left: auto; color: var(--swr-fg); font-variant-numeric: tabular-nums; }
+  /* The value carries a mode-dependent suffix (w / W / T) — preserve case
+     so the lowercase 'w' for Average mode isn't silently uppercased by the
+     parent .bar-row text-transform rule. */
+  .bar-row .val {
+    margin-left: auto; color: var(--swr-fg);
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+  }
 
   .track {
     position: relative;
