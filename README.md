@@ -80,6 +80,24 @@ ls -l /dev/ttyUSB_LPM
 If `/dev/ttyUSB_LPM` is missing, set `port = "/dev/ttyUSB0"` (or whatever the
 device is) in `/etc/lp100a-server/config.toml` and restart the service.
 
+## Redeploying after a code change
+
+After the first install, push subsequent changes from your dev machine with
+[`deploy/redeploy.sh`](deploy/redeploy.sh):
+
+```sh
+./deploy/redeploy.sh pi@raspberrypi.local           # rebuild, scp, restart
+./deploy/redeploy.sh pi@host --service              # also push systemd unit
+./deploy/redeploy.sh pi@host --udev                 # also push udev rule
+./deploy/redeploy.sh pi@host --restart-only         # skip build; just bounce the service
+ARCH=arm ./deploy/redeploy.sh pi@host               # 32-bit ARMv7 target
+```
+
+The script cross-compiles, scp's the binary into `/tmp/` on the Pi, stops the
+service, swaps the binary atomically with `install`, restarts, tails the last
+few journal lines, and finally hits `/healthz`. It needs SSH key auth and
+passwordless sudo (the Raspberry Pi OS default).
+
 ## Configuration
 
 `/etc/lp100a-server/config.toml`. Defaults are sensible; the fields you might
@@ -129,7 +147,8 @@ echo '{"type":"command","id":"1","action":"mode_step"}' | websocat ws://raspberr
 │   ├── lp100a-server.service     # systemd unit
 │   ├── 99-lp100a.rules           # udev rule for /dev/ttyUSB_LPM
 │   ├── build-pi.sh               # cross-compile from dev box
-│   └── install.sh                # install on the Pi
+│   ├── install.sh                # first-time install on the Pi
+│   └── redeploy.sh               # subsequent updates (build + scp + restart)
 └── .support/                     # vendor + 3rd-party references (read-only)
 ```
 
