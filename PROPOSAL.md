@@ -1,6 +1,6 @@
 # Proposal: LP-100A WebSocket Server
 
-**Status:** Implemented (M1–M4 shipped) · **Date:** 2026-05-07 · **Owner:** vinodes4@gmail.com
+**Status:** Implemented (M1–M4 shipped) · **Date:** 2026-05-07 · **Owner:** [VU3ESV/LP-100A-Server](https://github.com/VU3ESV/LP-100A-Server)
 
 ## 1. Problem
 
