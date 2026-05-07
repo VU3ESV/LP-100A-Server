@@ -21,10 +21,7 @@ max_clients   = 32
 allow_control = true
 
 [ui]
-# Which web display modes the Mode button cycles through. Set this to match
-# whichever modes you have enabled in the meter's "Opt. Mode Display" SETUP
-# screen — otherwise the web view and the LP-100A's LCD will drift out of
-# sync after each press of Mode.
+# Which web display modes the Mode button cycles through.
 #
 #   "normal"          — power + SWR bargraphs (always enabled on the meter)
 #   "vector"          — |Z|, phase, R, X with polar compass (always enabled)
@@ -32,7 +29,10 @@ allow_control = true
 #   "field_strength"  — dBm via Direct Input on the rear panel
 #   "peak_avg"        — Peak / Avg / ratio derived client-side over 2 s window
 #
-# Default matches the LP-100A's factory mode setting (Normal + Vector only).
-# To add e.g. dBm/RL: enable it in the meter's SETUP → Opt. Mode Display,
-# then add "dbm" here so both sides cycle through the same set.
-enabled_views = ["normal", "vector"]
+# Default enables all five views. Note: dBm/RL, Direct/FS and Peak-to-Average
+# are OFF in the meter's factory SETUP, so if you haven't enabled them in
+# "Opt. Mode Display" on the meter the web view and the LP-100A LCD will
+# drift out of sync after each press of Mode. Either enable the matching
+# modes in SETUP, or trim this list, or use the clickable VIEW pill to
+# re-align without sending Mode to the meter.
+enabled_views = ["normal", "vector", "dbm", "field_strength", "peak_avg"]
