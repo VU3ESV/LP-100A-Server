@@ -903,8 +903,8 @@
     $("dbw").textContent     = fmt(d.dbw, 1);
     $("dbm").textContent     = fmt(d.dbm, 1);
     $("swr-num").textContent = fmt(d.swr, 2);
-    $("z").textContent     = d.power_w > 0.1 ? fmt(d.z_ohm, 1)    : "--";
-    $("phase").textContent = d.power_w > 0.1 ? fmt(d.phase_deg, 1) : "--";
+    $("z").textContent       = fmt(d.z_ohm, 1);
+    $("phase").textContent   = fmt(d.phase_deg, 1);
 
     updatePwrTicks(d.range);
     const pwrMax = RANGE_MAX[d.range] || 750;
@@ -924,17 +924,16 @@
   }
 
   function renderVector(d) {
-    const live = d.power_w > 0.1;
     const z = d.z_ohm || 0;
     const ph = d.phase_deg || 0;
     const phRad = ph * Math.PI / 180;
     const r = z * Math.cos(phRad);
     const x = z * Math.sin(phRad);
 
-    $("vec-z").textContent  = live ? fmt(z, 1)   : "--";
-    $("vec-ph").textContent = live ? fmt(ph, 1)  : "--";
-    $("vec-r").textContent  = live ? fmt(r, 1)   : "--";
-    $("vec-x").textContent  = live ? (x >= 0 ? "+" : "") + fmt(x, 1) : "--";
+    $("vec-z").textContent  = fmt(z, 1);
+    $("vec-ph").textContent = fmt(ph, 1);
+    $("vec-r").textContent  = fmt(r, 1);
+    $("vec-x").textContent  = (x >= 0 ? "+" : "") + fmt(x, 1);
     $("vec-swr").textContent = fmt(d.swr, 2);
 
     // |Γ| = (SWR-1)/(SWR+1)
@@ -942,28 +941,19 @@
     $("vec-gamma").textContent = fmt(gamma, 3);
 
     // Compass: needle rotates by phase. Length scales with |Z|/100, capped.
+    // Draw the vector tip in compass coords: x = R proj (right=+R),
+    // y = -X proj (up = +jX). Length normalized to ring radius.
     const needle = $("vec-needle");
     const dot = $("vec-dot");
-    if (live) {
-      // We only get magnitude (0..200+) and phase (-90..+90 typically).
-      // Draw the vector tip in compass coords: x = R proj (right=+R),
-      // y = -X proj (up = +X reactive). Length normalized to ring radius.
-      const ringR = 70; // px (matches ~80% of compass-half)
-      const norm = Math.min(1, z / 100);
-      const tipX = norm * Math.cos(phRad) * ringR;
-      const tipY = -norm * Math.sin(phRad) * ringR;
-      needle.style.transform = `rotate(${-ph}deg) scaleX(${norm.toFixed(3)})`;
-      needle.style.opacity = 1;
-      dot.style.left = `calc(50% + ${tipX.toFixed(1)}px - 4px)`;
-      dot.style.top  = `calc(50% + ${tipY.toFixed(1)}px - 4px)`;
-      dot.style.opacity = 1;
-    } else {
-      needle.style.opacity = 0.25;
-      dot.style.opacity = 0.25;
-      needle.style.transform = "rotate(0deg) scaleX(0)";
-      dot.style.left = "calc(50% - 4px)";
-      dot.style.top  = "calc(50% - 4px)";
-    }
+    const ringR = 70; // px (matches the compass's inner ring)
+    const norm = Math.min(1, z / 100);
+    const tipX = norm * Math.cos(phRad) * ringR;
+    const tipY = -norm * Math.sin(phRad) * ringR;
+    needle.style.transform = `rotate(${-ph}deg) scaleX(${norm.toFixed(3)})`;
+    needle.style.opacity = 1;
+    dot.style.left = `calc(50% + ${tipX.toFixed(1)}px - 4px)`;
+    dot.style.top  = `calc(50% + ${tipY.toFixed(1)}px - 4px)`;
+    dot.style.opacity = 1;
   }
 
   function renderFieldStrength(d) {

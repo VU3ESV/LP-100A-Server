@@ -66,7 +66,7 @@ func defaults() Config {
 			AllowControl: true,
 		},
 		UI: UI{
-			EnabledViews: []string{"normal", "vector", "dbm", "field_strength", "peak_avg"},
+			EnabledViews: []string{"normal", "vector", "dbm", "field_strength"},
 		},
 	}
 }

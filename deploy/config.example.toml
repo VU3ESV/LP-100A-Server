@@ -30,8 +30,8 @@ allow_control = true
 #   "vector"          — |Z|, phase, R, X with polar compass (always enabled)
 #   "dbm"             — dBm + Return Loss + mismatch loss
 #   "field_strength"  — dBm via Direct Input on the rear panel
-#   "peak_avg"        — Peak / Avg / ratio derived client-side over 2 s window
 #
-# Default enables all five (matches the LP-100A factory state when all
-# optional modes are turned on in SETUP). Trim or re-order to match.
-enabled_views = ["normal", "vector", "dbm", "field_strength", "peak_avg"]
+# (The "peak_avg" view exists in the binary but isn't a default since the
+# meter's Peak-to-Avg mode requires a special audio test tone for any
+# meaningful reading.)
+enabled_views = ["normal", "vector", "dbm", "field_strength"]
