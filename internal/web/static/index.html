@@ -694,7 +694,7 @@
     </div>
 
     <div class="screen-foot">
-      <span class="pill clickable" id="view-pill" title="Click to advance the web view only — re-syncs without sending Mode to the meter">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
+      <span class="pill clickable" id="view-pill" title="Click to cycle the web display. (The meter LCD is cycled by the Mode button, separately.)">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
       <span class="pill clickable" id="setup-pill" title="Open the setup reference (read-only)">SETUP · <span class="v" id="setup-pill-state">…</span></span>
       <span class="pill">PWR · <span class="v" id="mode-label">—</span></span>
       <span class="pill">RANGE · <span class="v" id="range-label">—</span></span>
@@ -757,7 +757,9 @@
     $("screen-title").textContent = "LP-100A · " + title;
     $("mode-view-label").textContent = VIEW_LABELS[cycleName] || cycleName.toUpperCase();
     $("setup-pill-state").textContent = setupOpen ? "EXIT" : "OPEN";
-    $("btn-mode-sub").textContent = VIEWS.map(v => (VIEW_LABELS[v] || v).split(" ")[0]).join(" · ");
+    // Mode button is a remote control for the meter LCD only; it does not
+    // change the web view. Web view is selected via the VIEW pill.
+    $("btn-mode-sub").textContent = "Cycles meter LCD";
     // While setup is open, control buttons are not meaningful.
     ["btn-mode", "btn-alarm", "btn-peak"].forEach(id => {
       $(id).disabled = setupOpen || !connected;
@@ -1081,18 +1083,17 @@
   }
   const command = (action) => send({ type: "command", id: String(nextRefId++), action });
 
-  $("btn-mode").addEventListener("click", () => {
-    // Step the meter's LCD (sends 'M' over serial) AND the web view together.
-    command("mode_step");
-    viewIdx = (viewIdx + 1) % VIEWS.length;
-    applyView();
-  });
+  // Mode button cycles the METER's LCD only (sends 'M' over serial). It does
+  // NOT advance the web view — the serial protocol can't tell us what mode
+  // the meter ends up in, so any auto-cycle on the web side would just drift
+  // out of sync. The user picks the web view explicitly via the VIEW pill.
+  $("btn-mode").addEventListener("click", () => command("mode_step"));
   $("btn-alarm").addEventListener("click", () => command("alarm_step"));
   $("btn-peak").addEventListener("click",  () => command("peak_toggle"));
 
-  // VIEW pill: advance the web view WITHOUT sending Mode to the meter.
-  // Use this if the meter and web get out of sync (e.g. after restart, or
-  // if someone presses Mode on the physical device). No-op in setup view.
+  // VIEW pill: advance the web display through the configured views. Does
+  // NOT send Mode to the meter. Use this to pick what the web shows; use
+  // the Mode button to step the meter's LCD. No-op in setup view.
   $("view-pill").addEventListener("click", () => {
     if (setupOpen) return;
     viewIdx = (viewIdx + 1) % VIEWS.length;

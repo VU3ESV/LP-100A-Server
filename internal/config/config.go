@@ -26,11 +26,9 @@ type Server struct {
 	AllowControl bool   `toml:"allow_control"`
 }
 
-// UI controls how the web client cycles its display when Mode is pressed.
-// Match these to whichever modes are enabled in the meter's SETUP screen
-// ("Opt. Mode Display"); otherwise the web view and the meter LCD will
-// drift out of sync after each press. The default mirrors the LP-100A's
-// factory default — Normal and Vector are the two always-on modes.
+// UI controls which views the web client offers in its VIEW-pill cycle.
+// This is independent of the meter's display mode: the Mode button on the
+// web only cycles the meter's LCD; the VIEW pill cycles the web display.
 type UI struct {
 	EnabledViews []string `toml:"enabled_views"`
 }
