@@ -602,7 +602,7 @@
         </div>
         <div class="readouts">
           <div>
-            <div class="num-power"><span id="pwr-num">--</span><span class="unit">W</span></div>
+            <div class="num-power"><span id="pwr-num">--</span><span class="unit" id="pwr-unit">W</span></div>
             <div class="sub-power"><span id="dbw">--</span> dBW · <span id="dbm">--</span> dBm</div>
           </div>
           <div>
@@ -670,7 +670,7 @@
         <div class="dbm-row secondary">
           <span class="lbl">Power · SWR · |Γ|²</span>
           <span class="val">
-            <span id="dbm-w">--</span><span class="u">W</span>
+            <span id="dbm-w">--</span><span class="u" id="dbm-w-unit">W</span>
             &nbsp;·&nbsp; <span id="dbm-swr">--</span>
             &nbsp;·&nbsp; <span id="dbm-mismatch">--</span><span class="u">%</span>
           </span>
@@ -786,6 +786,15 @@
     field_strength: "FIELD STR.",
     peak_avg:       "PEAK / AVG",
   };
+
+  // Power-mode suffix the LP-100A LCD appends to the Power readout to
+  // indicate the F-button mode (Avg/Peak/Tune): "w" Average, "W" Peak,
+  // "T" Tune. Per the LP-100A Quick Start Guide v4.1, page 3.
+  const POWER_MODE_SUFFIX = {
+    average:   "w",
+    peak_hold: "W",
+    fast:      "T",
+  };
   const FALLBACK_VIEWS = ["normal", "vector"];
   let VIEWS = FALLBACK_VIEWS.slice();
   let viewIdx = 0;
@@ -899,9 +908,18 @@
   }
 
   function renderNormal(d) {
+    // Power suffix follows the meter's mode (w / W / T per the LP-100A LCD).
+    $("pwr-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
+
     $("pwr-num").textContent = fmt(d.power_w, 1);
-    $("dbw").textContent     = fmt(d.dbw, 1);
-    $("dbm").textContent     = fmt(d.dbm, 1);
+    // Derive dBm/dBW from Power so the readouts are consistent. Meter's
+    // own dBm field shows its detector noise-floor (~0.8 dBm) at no signal.
+    const live = d.power_w > 0;
+    const dbm  = live ? 10 * Math.log10(d.power_w * 1000) : 0;
+    const dbw  = dbm > 30 ? dbm - 30 : 0;
+    $("dbm").textContent = live ? fmt(dbm, 1) : "--";
+    $("dbw").textContent = live ? fmt(dbw, 1) : "--";
+
     $("swr-num").textContent = fmt(d.swr, 2);
     $("z").textContent       = fmt(d.z_ohm, 1);
     $("phase").textContent   = fmt(d.phase_deg, 1);
@@ -909,7 +927,7 @@
     updatePwrTicks(d.range);
     const pwrMax = RANGE_MAX[d.range] || 750;
     $("pwr-fill").style.width = pctClamp((d.power_w / pwrMax) * 100) + "%";
-    $("bar-pwr-val").textContent = fmt(d.power_w, 1) + " W";
+    $("bar-pwr-val").textContent = fmt(d.power_w, 1) + " " + (POWER_MODE_SUFFIX[d.mode] || "W");
 
     const swrPct = pctClamp(((d.swr - 1.0) / (SWR_MAX - 1.0)) * 100);
     const swrFill = $("swr-fill");
@@ -1005,7 +1023,15 @@
   }
 
   function renderDbm(d) {
-    $("dbm-dbm").textContent = fmt(d.dbm, 1);
+    // Derive dBm from Power (couplers measure both). The meter's own dBm
+    // field shows detector noise-floor (~0.8 dBm) at no signal, confusing
+    // alongside Power = 0 W.
+    const live = d.power_w > 0;
+    const dbm  = live ? 10 * Math.log10(d.power_w * 1000) : 0;
+
+    $("dbm-w-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
+
+    $("dbm-dbm").textContent = live ? fmt(dbm, 1) : "--";
     $("dbm-w").textContent   = fmt(d.power_w, 1);
     $("dbm-swr").textContent = fmt(d.swr, 2);
 
@@ -1017,7 +1043,7 @@
     $("dbm-mismatch").textContent = fmt(gamma * gamma * 100, 2);
 
     // dBm bar: scale 0..70 dBm (1 µW to 10 kW)
-    $("dbm-bar").style.width = pctClamp(((d.dbm || 0) / 70) * 100) + "%";
+    $("dbm-bar").style.width = live ? pctClamp((dbm / 70) * 100) + "%" : "0%";
     // RL bar: 0 dB (worst) to 40 dB (excellent), full bar at 40 dB
     const rlPct = isFinite(rl) ? pctClamp((rl / 40) * 100) : 100;
     $("rl-bar").style.width = rlPct + "%";
