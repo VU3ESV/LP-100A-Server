@@ -20,10 +20,12 @@ import (
 
 func main() {
 	configPath := flag.String("config", "/etc/lp100a-server/config.toml", "config file path (missing file is fine; defaults are used)")
-	verbose := flag.Bool("v", false, "verbose (debug) logging")
+	verbose := flag.Bool("v", false, "verbose logging (debug-level: per-frame trace + operational events)")
 	flag.Parse()
 
-	level := slog.LevelInfo
+	// Default is error-only to keep the journal quiet during normal use.
+	// Pass -v to see operational events and per-poll trace output.
+	level := slog.LevelError
 	if *verbose {
 		level = slog.LevelDebug
 	}
