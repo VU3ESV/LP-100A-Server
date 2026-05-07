@@ -5,160 +5,396 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LP-100A</title>
 <style>
+  /* LP-100A "Normal Mode" face — modeled after telepostinc.com/lp100.html.
+     Dark LCD with two horizontal bargraphs (Pwr, SWR) on the left, large
+     amber power readout and SWR readout on the right, three buttons below. */
   :root {
-    --bg: #0e1116;
-    --panel: #161b22;
-    --border: #2a313c;
-    --text: #e6edf3;
-    --muted: #7d8590;
-    --accent: #2ea043;
-    --warn: #d29922;
-    --danger: #f85149;
-    --off: #484f58;
+    --bezel:        #1a1d22;
+    --bezel-edge:   #0a0c0e;
+    --case:         #11151a;
+    --lcd:          #06080a;
+    --lcd-border:   #2a323c;
+    --grid:         #1d2630;
+    --tick:         #4a5566;
+    --bar:          #18d4b3;       /* cyan/teal segmented bar */
+    --bar-glow:     #18d4b366;
+    --peak:         #b9fff2;       /* sticky peak marker */
+    --power:        #ffba2b;       /* amber numeric */
+    --power-glow:   rgba(255,186,43,0.35);
+    --swr-fg:       #e8eef2;
+    --swr-glow:     rgba(232,238,242,0.18);
+    --green:        #2ecc71;
+    --yellow:       #f1c40f;
+    --red:          #e74c3c;
+    --muted:        #6f7a87;
+    --accent:       #18d4b3;
+    --label:        #8a96a4;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(ellipse at top, #1c232b 0%, #0b0e12 60%, #07090c 100%);
+    color: var(--swr-fg);
+    font: 14px/1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px 16px 40px;
   }
-  header {
+
+  /* Top status strip (above the meter) */
+  .topbar {
+    width: 100%;
+    max-width: 760px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  .status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
     color: var(--muted);
-  }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); }
-  .dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-  .dot.reconnecting { background: var(--warn); }
-  .dot.disconnected { background: var(--danger); }
-
-  main {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 20px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-  }
-  .card h2 {
-    margin: 0 0 8px;
     font-size: 12px;
-    font-weight: 600;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
+    padding: 0 4px 14px;
+  }
+  .topbar .brand { color: var(--swr-fg); font-weight: 600; }
+  .topbar .right { display: inline-flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+  .dot.connected     { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.reconnecting  { background: var(--yellow); }
+  .dot.disconnected  { background: var(--red); }
+
+  /* The meter "case": bezel + LCD inset + button row */
+  .meter {
+    width: 100%;
+    max-width: 760px;
+    background: linear-gradient(180deg, var(--case) 0%, #0a0d11 100%);
+    border: 1px solid var(--bezel-edge);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 30px 60px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(255,255,255,0.03);
+  }
+
+  .lcd {
+    background: var(--lcd);
+    border: 1px solid var(--lcd-border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow:
+      inset 0 0 0 1px #000,
+      inset 0 0 60px rgba(24,212,179,0.06);
+    position: relative;
+  }
+  /* Subtle scanline texture */
+  .lcd::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  /* Screen header line: mode label + small status */
+  .screen-head {
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .screen-head .title { color: var(--accent); }
+  .screen-head .cs    { color: var(--swr-fg); letter-spacing: 0.8px; }
+
+  /* Two-column grid: bars (left) | numerics (right) */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr minmax(180px, 220px);
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  /* Bargraph block */
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bar-group { }
+  .bar-row {
+    display: flex; align-items: baseline; gap: 10px;
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .bar-row .lbl { width: 32px; color: var(--accent); font-weight: 600; }
+  .bar-row .val { margin-left: auto; color: var(--swr-fg); font-variant-numeric: tabular-nums; }
+
+  .track {
+    position: relative;
+    height: 22px;
+    margin-top: 4px;
+    background:
+      repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent 8px,
+        rgba(0,0,0,0.7) 8px,
+        rgba(0,0,0,0.7) 9px),
+      var(--grid);
+    border: 1px solid #000;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 0;
+    background: linear-gradient(180deg, #2bf0cd 0%, var(--bar) 50%, #0aa088 100%);
+    box-shadow: 0 0 12px var(--bar-glow);
+    transition: width 90ms linear;
+  }
+  .fill.swr-warn  { background: linear-gradient(180deg, #ffe35e 0%, var(--yellow) 50%, #b8910b 100%); box-shadow: 0 0 12px rgba(241,196,15,0.45); }
+  .fill.swr-bad   { background: linear-gradient(180deg, #ff8b7e 0%, var(--red) 50%, #a52a1d 100%); box-shadow: 0 0 14px rgba(231,76,60,0.55); }
+
+  .peak {
+    position: absolute; top: -2px; bottom: -2px;
+    width: 2px;
+    background: var(--peak);
+    box-shadow: 0 0 6px var(--peak);
+    transition: left 200ms linear;
+    opacity: 0.9;
+  }
+
+  .ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 4px;
+    color: var(--tick);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.5px;
-    color: var(--muted);
   }
-  .reading { font-size: 36px; font-weight: 600; line-height: 1; }
-  .reading .unit { font-size: 16px; color: var(--muted); margin-left: 6px; }
-  .sub { color: var(--muted); margin-top: 4px; font-size: 12px; }
+  .ticks span { transform: translateX(-50%); }
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child  { transform: translateX(0); }
 
-  .bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
-  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width 80ms linear; }
-  .bar.warn > div { background: var(--warn); }
-  .bar.danger > div { background: var(--danger); }
-
-  .leds { display: flex; gap: 12px; }
-  .led {
-    display: flex; align-items: center; gap: 6px;
-    color: var(--muted); font-size: 12px;
-    text-transform: uppercase; letter-spacing: 0.5px;
+  /* Numeric readouts (right column) */
+  .readouts {
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    text-align: right;
+    border-left: 1px dashed #1f2a35;
+    padding-left: 18px;
   }
-  .led .dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .num-power {
+    color: var(--power);
+    font: 700 44px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px var(--power-glow);
+    letter-spacing: -1px;
+  }
+  .num-power .unit { font-size: 18px; color: var(--power); opacity: 0.85; margin-left: 4px; }
+  .sub-power {
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .num-swr {
+    color: var(--swr-fg);
+    font: 700 30px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px var(--swr-glow);
+    margin-top: 18px;
+  }
+  .num-swr .label { color: var(--label); font-size: 14px; font-weight: 600; letter-spacing: 1px; margin-right: 8px; }
+  .sub-z {
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sub-z .v { color: var(--swr-fg); }
 
-  .controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
-  button {
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 10px 14px;
+  /* Bottom screen status row: mode + range + coupler + alarm */
+  .screen-foot {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed #1f2a35;
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--swr-fg);
+  }
+  .pill .v { color: var(--accent); }
+  .pill.alarm-tripped { color: var(--red); }
+  .pill.alarm-tripped .v { color: var(--red); animation: blink 0.6s steps(2,end) infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* Button row (bezel) */
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  button.key {
+    appearance: none;
+    background: linear-gradient(180deg, #1f262e 0%, #131820 100%);
+    color: var(--swr-fg);
+    border: 1px solid #2a323c;
+    border-bottom-color: #050709;
     border-radius: 6px;
+    padding: 14px 10px;
+    font: 600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
     cursor: pointer;
-    font: inherit;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 2px 4px rgba(0,0,0,0.4);
+    transition: transform 60ms ease, background 120ms ease;
+  }
+  button.key small {
+    display: block;
+    color: var(--label);
+    font-size: 9px;
     font-weight: 500;
+    margin-top: 4px;
+    letter-spacing: 1.1px;
   }
-  button:hover { border-color: #3d4754; }
-  button:active { transform: translateY(1px); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.key:hover:not(:disabled) { background: linear-gradient(180deg, #25303a 0%, #161c25 100%); }
+  button.key:active:not(:disabled) { transform: translateY(1px); }
+  button.key:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .meta { font-size: 12px; color: var(--muted); }
-  .alarm-pill {
-    display: inline-block; padding: 2px 8px; border-radius: 10px;
-    background: var(--off); color: var(--text); font-size: 12px;
+  /* Responsive: stack on small screens */
+  @media (max-width: 540px) {
+    .grid { grid-template-columns: 1fr; }
+    .readouts { border-left: none; padding-left: 0; align-items: flex-start; text-align: left; }
+    .num-power { font-size: 36px; }
+    .num-swr { font-size: 26px; margin-top: 10px; }
   }
-  .alarm-pill.tripped { background: var(--danger); }
 </style>
 </head>
 <body>
-<header>
-  <h1>LP-100A</h1>
-  <div class="status">
-    <span id="callsign" class="meta"></span>
+
+<div class="topbar">
+  <div class="brand">LP-100A · WebSocket Bridge</div>
+  <div class="right">
     <span class="dot" id="status-dot"></span>
     <span id="status-text">connecting…</span>
   </div>
-</header>
+</div>
 
-<main>
-  <section class="card">
-    <h2>Power</h2>
-    <div class="reading"><span id="power">--</span><span class="unit">W</span></div>
-    <div class="sub"><span id="dbw">--</span> dBW · <span id="dbm">--</span> dBm</div>
-    <div class="bar"><div id="power-bar"></div></div>
-    <div class="leds" style="margin-top: 8px;">
-      <div class="led"><span class="dot" id="led-low"></span>Low</div>
-      <div class="led"><span class="dot" id="led-mid"></span>Mid</div>
-      <div class="led"><span class="dot" id="led-high"></span>High</div>
+<div class="meter">
+  <div class="lcd">
+
+    <div class="screen-head">
+      <span class="title">LP-100A · NORMAL</span>
+      <span class="cs" id="callsign">—</span>
     </div>
-  </section>
 
-  <section class="card">
-    <h2>SWR</h2>
-    <div class="reading"><span id="swr">--</span></div>
-    <div class="sub">Alarm: <span class="alarm-pill" id="alarm-pill">off</span></div>
-    <div class="bar"><div id="swr-bar"></div></div>
-  </section>
+    <div class="grid">
+      <div class="bars">
 
-  <section class="card">
-    <h2>Impedance</h2>
-    <div class="reading"><span id="z">--</span><span class="unit">Ω</span></div>
-    <div class="sub">Phase: <span id="phase">--</span>°</div>
-  </section>
+        <div class="bar-group">
+          <div class="bar-row">
+            <span class="lbl">PWR</span>
+            <span id="bar-pwr-scale-label">Auto · 50mW–750W</span>
+            <span class="val" id="bar-pwr-val">--</span>
+          </div>
+          <div class="track">
+            <div class="fill" id="pwr-fill"></div>
+            <div class="peak" id="pwr-peak" style="left: 0%;"></div>
+          </div>
+          <div class="ticks" id="pwr-ticks">
+            <span>0</span><span>10</span><span>50</span><span>100</span><span>250</span><span>500</span><span>750</span>
+          </div>
+        </div>
 
-  <section class="card">
-    <h2>Mode</h2>
-    <div class="reading" style="font-size: 24px;"><span id="mode">--</span></div>
-    <div class="sub">Range: <span id="range">--</span></div>
-  </section>
+        <div class="bar-group">
+          <div class="bar-row">
+            <span class="lbl">SWR</span>
+            <span>1.0 → 5.0</span>
+            <span class="val" id="bar-swr-val">--</span>
+          </div>
+          <div class="track">
+            <div class="fill" id="swr-fill"></div>
+            <div class="peak" id="swr-peak" style="left: 0%;"></div>
+          </div>
+          <div class="ticks">
+            <span>1.0</span><span>1.2</span><span>1.5</span><span>2.0</span><span>2.5</span><span>3.0</span><span>5.0</span>
+          </div>
+        </div>
 
-  <section class="controls">
-    <button id="btn-mode" disabled>Mode (M)</button>
-    <button id="btn-alarm" disabled>Alarm Setpoint (A)</button>
-    <button id="btn-peak" disabled>Peak / Avg / Tune (F)</button>
-  </section>
-</main>
+      </div>
+
+      <div class="readouts">
+        <div>
+          <div class="num-power"><span id="pwr-num">--</span><span class="unit">W</span></div>
+          <div class="sub-power"><span id="dbw">--</span> dBW · <span id="dbm">--</span> dBm</div>
+        </div>
+        <div>
+          <div class="num-swr"><span class="label">SWR</span><span id="swr-num">--</span></div>
+          <div class="sub-z">Z <span class="v" id="z">--</span> Ω · ∠ <span class="v" id="phase">--</span>°</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-foot">
+      <span class="pill">MODE · <span class="v" id="mode-label">—</span></span>
+      <span class="pill">RANGE · <span class="v" id="range-label">—</span></span>
+      <span class="pill" id="alarm-pill">ALARM · <span class="v" id="alarm-label">off</span></span>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button class="key" id="btn-mode" disabled>
+      Mode
+      <small>Avg · Peak · Tune</small>
+    </button>
+    <button class="key" id="btn-alarm" disabled>
+      Alarm Dn
+      <small>SWR setpoint</small>
+    </button>
+    <button class="key" id="btn-peak" disabled>
+      Peak / Avg / Tune
+      <small>Toggle (F)</small>
+    </button>
+  </div>
+</div>
 
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const fmt = (v, d = 2) => (v === null || v === undefined ? "--" : Number(v).toFixed(d));
+  const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v)) ? "--" : Number(v).toFixed(d));
+
+  // Range -> max watts (mirrors LP-100A's High/Mid/Low ranges).
+  const RANGE_MAX = { high: 750, mid: 125, low: 25 };
+  const PWR_TICKS = {
+    high: ["0", "50", "125", "250", "500", "750"],
+    mid:  ["0", "10", "25", "50", "75", "125"],
+    low:  ["0", "2", "5", "10", "15", "25"],
+  };
+  const SWR_MAX = 5.0;
+
+  // Sticky peak hold for the bargraphs (decays slowly so it briefly trails).
+  let peakPwr = 0, peakSwr = 1.0;
+  let peakPwrAt = 0, peakSwrAt = 0;
 
   const dot = $("status-dot");
   const statusText = $("status-text");
@@ -170,52 +406,79 @@
     buttons.forEach(b => b.disabled = !enable);
   };
 
-  const RANGE_MAX = { high: 750, mid: 125, low: 25 };
+  function updatePwrTicks(range) {
+    const ticks = PWR_TICKS[range] || PWR_TICKS.high;
+    const el = $("pwr-ticks");
+    el.innerHTML = ticks.map(t => `<span>${t}</span>`).join("");
+    const max = RANGE_MAX[range] || 750;
+    $("bar-pwr-scale-label").textContent = `${range || "?"} · 0–${max} W`;
+  }
+
+  function pctClamp(p) { return Math.max(0, Math.min(100, p)); }
+
+  function render(d) {
+    // Numerics
+    $("pwr-num").textContent = fmt(d.power_w, 1);
+    $("dbw").textContent = fmt(d.dbw, 1);
+    $("dbm").textContent = fmt(d.dbm, 1);
+    $("swr-num").textContent = fmt(d.swr, 2);
+    $("z").textContent     = d.power_w > 0.1 ? fmt(d.z_ohm, 1)    : "--";
+    $("phase").textContent = d.power_w > 0.1 ? fmt(d.phase_deg, 1) : "--";
+    $("callsign").textContent = (d.callsign || "—").trim() || "—";
+
+    // Status pills
+    $("mode-label").textContent  = (d.mode || "").replace("_", " ") || "—";
+    $("range-label").textContent = d.range || "—";
+    $("alarm-label").textContent = d.alarm_setpoint || "off";
+    const pill = $("alarm-pill");
+    pill.classList.toggle("alarm-tripped", !!d.alarm_tripped);
+
+    // Bargraphs
+    updatePwrTicks(d.range);
+    const pwrMax = RANGE_MAX[d.range] || 750;
+    const pwrPct = pctClamp((d.power_w / pwrMax) * 100);
+    $("pwr-fill").style.width = pwrPct + "%";
+    $("bar-pwr-val").textContent = fmt(d.power_w, 1) + " W";
+
+    const swrPct = pctClamp(((d.swr - 1.0) / (SWR_MAX - 1.0)) * 100);
+    const swrFill = $("swr-fill");
+    swrFill.style.width = swrPct + "%";
+    swrFill.classList.toggle("swr-warn", d.swr >= 1.5 && d.swr < 2.0);
+    swrFill.classList.toggle("swr-bad",  d.swr >= 2.0);
+    $("bar-swr-val").textContent = fmt(d.swr, 2);
+
+    // Sticky peak markers — rise instantly, hold ~1.5s, then decay.
+    const now = performance.now();
+    if (d.power_w > peakPwr) { peakPwr = d.power_w; peakPwrAt = now; }
+    if (d.swr     > peakSwr) { peakSwr = d.swr;     peakSwrAt = now; }
+  }
+
+  // Decay loop runs even between updates so peak markers fall.
+  function tick() {
+    const now = performance.now();
+    if (now - peakPwrAt > 1500) peakPwr = Math.max(0, peakPwr - peakPwr * 0.05);
+    if (now - peakSwrAt > 1500) peakSwr = Math.max(1.0, peakSwr - (peakSwr - 1.0) * 0.05);
+    const range = ($("range-label").textContent || "high").trim();
+    const pwrMax = RANGE_MAX[range] || 750;
+    $("pwr-peak").style.left = pctClamp((peakPwr / pwrMax) * 100) + "%";
+    $("swr-peak").style.left = pctClamp(((peakSwr - 1.0) / (SWR_MAX - 1.0)) * 100) + "%";
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // WebSocket I/O
   let nextRefId = 1;
   let ws = null;
   let backoff = 500;
-
-  function render(d) {
-    $("power").textContent = fmt(d.power_w, 1);
-    $("dbw").textContent = fmt(d.dbw, 1);
-    $("dbm").textContent = fmt(d.dbm, 1);
-    $("swr").textContent = fmt(d.swr, 2);
-    $("z").textContent = d.power_w > 0.1 ? fmt(d.z_ohm, 1) : "--";
-    $("phase").textContent = d.power_w > 0.1 ? fmt(d.phase_deg, 1) : "--";
-    $("mode").textContent = (d.mode || "").replace("_", " ");
-    $("range").textContent = d.range || "--";
-    $("callsign").textContent = d.callsign || "";
-
-    const max = RANGE_MAX[d.range] || 750;
-    const pct = Math.min(100, (d.power_w / max) * 100);
-    $("power-bar").style.width = pct + "%";
-    const pbar = $("power-bar").parentElement;
-    pbar.classList.toggle("warn", pct > 80);
-    pbar.classList.toggle("danger", pct > 95);
-
-    const swrPct = Math.min(100, ((d.swr - 1) / 4) * 100);
-    $("swr-bar").style.width = swrPct + "%";
-    const sbar = $("swr-bar").parentElement;
-    sbar.classList.toggle("warn", d.swr >= 1.5 && d.swr < 2);
-    sbar.classList.toggle("danger", d.swr >= 2);
-
-    $("led-low").classList.toggle("on", d.range === "low");
-    $("led-mid").classList.toggle("on", d.range === "mid");
-    $("led-high").classList.toggle("on", d.range === "high");
-
-    const pill = $("alarm-pill");
-    pill.textContent = d.alarm_setpoint || "off";
-    pill.classList.toggle("tripped", !!d.alarm_tripped);
-  }
 
   function send(obj) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
   }
   const command = (action) => send({ type: "command", id: String(nextRefId++), action });
 
-  $("btn-mode").addEventListener("click", () => command("mode_step"));
+  $("btn-mode").addEventListener("click",  () => command("mode_step"));
   $("btn-alarm").addEventListener("click", () => command("alarm_step"));
-  $("btn-peak").addEventListener("click", () => command("peak_toggle"));
+  $("btn-peak").addEventListener("click",  () => command("peak_toggle"));
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -239,7 +502,6 @@
     };
     ws.onerror = () => { try { ws.close(); } catch (_) {} };
   }
-
   connect();
 })();
 </script>
