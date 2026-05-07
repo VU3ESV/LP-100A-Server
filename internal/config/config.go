@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Serial Serial `toml:"serial"`
 	Server Server `toml:"server"`
+	UI     UI     `toml:"ui"`
 }
 
 type Serial struct {
@@ -25,6 +26,24 @@ type Server struct {
 	AllowControl bool   `toml:"allow_control"`
 }
 
+// UI controls how the web client cycles its display when Mode is pressed.
+// Match these to whichever modes are enabled in the meter's SETUP screen
+// ("Opt. Mode Display"); otherwise the web view and the meter LCD will
+// drift out of sync after each press. The default mirrors the LP-100A's
+// factory default — Normal and Vector are the two always-on modes.
+type UI struct {
+	EnabledViews []string `toml:"enabled_views"`
+}
+
+// ValidViews is the set of view names the web client supports rendering.
+// Field Strength and Peak-to-Average modes from the physical meter need
+// inputs the serial protocol does not expose, so they're not represented.
+var ValidViews = map[string]bool{
+	"normal": true,
+	"vector": true,
+	"dbm":    true,
+}
+
 func defaults() Config {
 	return Config{
 		Serial: Serial{
@@ -37,6 +56,9 @@ func defaults() Config {
 			HeartbeatMs:  2000,
 			MaxClients:   32,
 			AllowControl: true,
+		},
+		UI: UI{
+			EnabledViews: []string{"normal", "vector"},
 		},
 	}
 }
@@ -77,6 +99,14 @@ func (c Config) validate() error {
 	}
 	if c.Server.HeartbeatMs < 200 {
 		return fmt.Errorf("server.heartbeat_ms must be >= 200")
+	}
+	if len(c.UI.EnabledViews) == 0 {
+		return fmt.Errorf("ui.enabled_views must list at least one view")
+	}
+	for _, v := range c.UI.EnabledViews {
+		if !ValidViews[v] {
+			return fmt.Errorf("ui.enabled_views: unknown view %q (valid: normal, vector, dbm)", v)
+		}
 	}
 	return nil
 }

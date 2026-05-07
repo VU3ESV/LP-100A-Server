@@ -316,6 +316,9 @@
   .pill .v { color: var(--accent); }
   .pill.alarm-tripped { color: var(--red); }
   .pill.alarm-tripped .v { color: var(--red); animation: blink 0.6s steps(2,end) infinite; }
+  .pill.clickable { cursor: pointer; user-select: none; padding: 2px 6px; margin: -2px -6px; border-radius: 4px; transition: background 120ms ease; }
+  .pill.clickable:hover { background: rgba(24,212,179,0.08); }
+  .pill.clickable:active { background: rgba(24,212,179,0.16); }
   @keyframes blink { 50% { opacity: 0.3; } }
 
   .buttons {
@@ -485,7 +488,7 @@
     </div>
 
     <div class="screen-foot">
-      <span class="pill">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
+      <span class="pill clickable" id="view-pill" title="Click to advance the web view only — re-syncs without sending Mode to the meter">VIEW · <span class="v" id="mode-view-label">NORMAL</span></span>
       <span class="pill">PWR · <span class="v" id="mode-label">—</span></span>
       <span class="pill">RANGE · <span class="v" id="range-label">—</span></span>
       <span class="pill" id="alarm-pill">ALARM · <span class="v" id="alarm-label">off</span></span>
@@ -495,7 +498,7 @@
   <div class="buttons">
     <button class="key" id="btn-mode" disabled>
       Mode
-      <small>Normal · Vector · dBm</small>
+      <small id="btn-mode-sub">…</small>
     </button>
     <button class="key" id="btn-alarm" disabled>
       Alarm Dn
@@ -514,23 +517,48 @@
   const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v)) ? "--" : Number(v).toFixed(d));
   const pctClamp = (p) => Math.max(0, Math.min(100, p));
 
-  // --- Web view modes (independent of meter LCD mode; M cycles both) ------
-  const VIEWS = ["normal", "vector", "dbm"];
+  // --- Web view modes -----------------------------------------------------
+  // VIEWS is loaded from /api/config so the cycle matches whichever modes
+  // the meter has enabled in its SETUP screen. Default matches the meter's
+  // factory configuration (Normal + Vector only). Set the [ui] enabled_views
+  // list in the server config to enable additional views (e.g. dbm).
   const VIEW_LABELS = { normal: "NORMAL", vector: "VECTOR Z", dbm: "DBM / RL" };
-  let viewIdx = (() => {
+  const FALLBACK_VIEWS = ["normal", "vector"];
+  let VIEWS = FALLBACK_VIEWS.slice();
+  let viewIdx = 0;
+
+  function loadPersistedViewIdx() {
     const saved = localStorage.getItem("lp100a.viewIdx");
     const n = saved !== null ? parseInt(saved, 10) : 0;
     return Number.isInteger(n) && n >= 0 && n < VIEWS.length ? n : 0;
-  })();
+  }
+
   function applyView() {
-    const name = VIEWS[viewIdx];
+    const name = VIEWS[viewIdx] || "normal";
     document.querySelectorAll(".view").forEach(el => {
       el.classList.toggle("active", el.dataset.view === name);
     });
-    $("screen-title").textContent = "LP-100A · " + VIEW_LABELS[name];
-    $("mode-view-label").textContent = VIEW_LABELS[name];
+    $("screen-title").textContent = "LP-100A · " + (VIEW_LABELS[name] || name.toUpperCase());
+    $("mode-view-label").textContent = VIEW_LABELS[name] || name.toUpperCase();
+    $("btn-mode-sub").textContent = VIEWS.map(v => (VIEW_LABELS[v] || v).split(" ")[0]).join(" · ");
     localStorage.setItem("lp100a.viewIdx", String(viewIdx));
-    if (lastData) render(lastData);  // re-render against current data
+    if (lastData) render(lastData);
+  }
+
+  async function loadConfig() {
+    try {
+      const r = await fetch("/api/config", { cache: "no-store" });
+      if (!r.ok) throw new Error("status " + r.status);
+      const cfg = await r.json();
+      if (Array.isArray(cfg.views) && cfg.views.length > 0) {
+        VIEWS = cfg.views.filter(v => VIEW_LABELS[v]);
+        if (VIEWS.length === 0) VIEWS = FALLBACK_VIEWS.slice();
+      }
+    } catch (_) {
+      // Fall back to defaults if the endpoint is unreachable.
+    }
+    viewIdx = loadPersistedViewIdx();
+    applyView();
   }
 
   // --- Connection state ---------------------------------------------------
@@ -698,6 +726,14 @@
   $("btn-alarm").addEventListener("click", () => command("alarm_step"));
   $("btn-peak").addEventListener("click",  () => command("peak_toggle"));
 
+  // VIEW pill: advance the web view WITHOUT sending Mode to the meter.
+  // Use this if the meter and web get out of sync (e.g. after restart, or
+  // if someone presses Mode on the physical device).
+  $("view-pill").addEventListener("click", () => {
+    viewIdx = (viewIdx + 1) % VIEWS.length;
+    applyView();
+  });
+
   function connect() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${proto}//${location.host}/ws`;
@@ -718,9 +754,8 @@
     ws.onerror = () => { try { ws.close(); } catch (_) {} };
   }
 
-  // Initial paint: apply persisted view, then connect.
-  applyView();
-  connect();
+  // Initial paint: load server config (which sets VIEWS), then connect.
+  loadConfig().then(connect);
 })();
 </script>
 </body>

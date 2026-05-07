@@ -19,3 +19,18 @@ listen        = "0.0.0.0:8088"
 heartbeat_ms  = 2000
 max_clients   = 32
 allow_control = true
+
+[ui]
+# Which web display modes the Mode button cycles through. Set this to match
+# whichever modes you have enabled in the meter's "Opt. Mode Display" SETUP
+# screen — otherwise the web view and the LP-100A's LCD will drift out of
+# sync after each press of Mode.
+#
+#   "normal"  — power + SWR bargraphs (always enabled on the meter)
+#   "vector"  — Z, phase, R, X with a polar compass (always enabled)
+#   "dbm"     — dBm + Return Loss + mismatch loss
+#
+# Field Strength and Peak-to-Average modes from the physical meter aren't
+# included here because they need inputs the serial protocol doesn't expose.
+# Default matches the LP-100A's factory mode setting.
+enabled_views = ["normal", "vector"]

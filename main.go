@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"log/slog"
@@ -62,6 +63,14 @@ func main() {
 	mux.HandleFunc("/ws", h.ServeWS)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok\n"))
+	})
+	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"views":         cfg.UI.EnabledViews,
+			"allow_control": cfg.Server.AllowControl,
+		})
 	})
 	mux.Handle("/", web.StaticHandler())
 

@@ -113,6 +113,7 @@ change:
 | `server.listen`             | `0.0.0.0:8088`       | Bind to a LAN IP for safety                      |
 | `server.allow_control`      | `true`               | Set `false` for a read-only port                 |
 | `server.max_clients`        | `32`                 |                                                  |
+| `ui.enabled_views`          | `["normal","vector"]`| Web Mode-button cycle. Match to the meter's "Opt. Mode Display" SETUP screen so they stay in sync. Add `"dbm"` if enabled on the meter. |
 
 After editing: `sudo systemctl restart lp100a-server`.
 
