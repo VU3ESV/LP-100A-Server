@@ -12,17 +12,22 @@
 #
 # What it does:
 #   1. Cross-compiles the binary (skips if --restart-only)
-#   2. scp's it to /tmp/ on the target
-#   3. ssh's in, stops the service, swaps the binary, restarts, tails logs
-#   4. Hits /healthz to confirm it's live
+#   2. Opens a single multiplexed SSH session to the target (one auth prompt)
+#   3. scp's the binary + a remote install script to /tmp/
+#   4. Runs the script under `ssh -t` so sudo can prompt for a password
+#      (and so passwordless sudo also works without complaint)
+#   5. Hits /healthz to confirm the service is live
 #
-# Prerequisites on the dev machine:
-#   - Go installed (for cross-compile)
-#   - SSH key auth to the target (no password prompts)
+# Auth:
+#   Recommended  : SSH key auth + passwordless sudo (one quiet redeploy).
+#   Also fine    : SSH password + interactive sudo password (you'll be
+#                  prompted at most twice — once for SSH, once for sudo).
+#   To set up keys: ssh-copy-id pi@host
+#   To set up passwordless sudo on the Pi:
+#     echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER-nopasswd
 #
 # Prerequisites on the Pi:
 #   - install.sh has already run once (creates user, service, paths, udev rule, config)
-#   - The SSH user has passwordless sudo (default on Raspberry Pi OS)
 #
 # Usage:
 #   ./deploy/redeploy.sh pi@raspberrypi.local
@@ -65,9 +70,8 @@ case "$ARCH" in
 esac
 BIN="dist/$BIN_NAME"
 
-if ! command -v ssh >/dev/null 2>&1; then
-  echo "ssh not found in PATH" >&2; exit 1
-fi
+if ! command -v ssh >/dev/null 2>&1; then echo "ssh not found in PATH" >&2; exit 1; fi
+if ! command -v scp >/dev/null 2>&1; then echo "scp not found in PATH" >&2; exit 1; fi
 if [ "$RESTART_ONLY" -eq 0 ] && ! command -v go >/dev/null 2>&1; then
   echo "go not found in PATH (needed to cross-compile; install Go or pass --restart-only)" >&2
   exit 1
@@ -76,29 +80,35 @@ fi
 step() { printf '\n\033[1;36m>>>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!! %s\033[0m\n' "$*"; }
 
-# 1. Build
+# --- SSH connection multiplexing -------------------------------------------
+# One ControlMaster connection serves all scp + ssh calls below, so password
+# auth (if used) only prompts once.
+SSH_TMPDIR=$(mktemp -d -t lp100a-ssh.XXXXXX)
+SSH_CTRL="$SSH_TMPDIR/cm.sock"
+SSH_OPTS=(-o "ControlMaster=auto" -o "ControlPath=$SSH_CTRL" -o "ControlPersist=120s")
+LOCAL_SCRIPT=""
+
+cleanup() {
+  if [ -S "$SSH_CTRL" ]; then
+    ssh "${SSH_OPTS[@]}" -O exit "$TARGET" 2>/dev/null || true
+  fi
+  [ -n "$LOCAL_SCRIPT" ] && rm -f "$LOCAL_SCRIPT"
+  rm -rf "$SSH_TMPDIR"
+}
+trap cleanup EXIT
+
+# --- 1. Build ---------------------------------------------------------------
 if [ "$RESTART_ONLY" -eq 0 ]; then
   step "Cross-compiling for $ARCH"
   ARCH="$ARCH" ./deploy/build-pi.sh
   [ -x "$BIN" ] || { echo "build did not produce $BIN" >&2; exit 1; }
 fi
 
-# 2. Stage files on the target
-SCP_FILES=()
-if [ "$RESTART_ONLY" -eq 0 ]; then
-  SCP_FILES+=("$BIN")
-fi
-if [ "$UPDATE_SERVICE" -eq 1 ]; then SCP_FILES+=(deploy/lp100a-server.service); fi
-
-if [ "${#SCP_FILES[@]}" -gt 0 ]; then
-  step "Copying $(echo "${SCP_FILES[@]}" | wc -w | tr -d ' ') file(s) to $TARGET:/tmp/"
-  scp -q "${SCP_FILES[@]}" "$TARGET:/tmp/"
-fi
-
-# 3. Build the remote install script. Each branch is conditional on the flags
-# above so we don't run unnecessary sudo commands on the Pi.
+# --- 2. Compose the remote install script (on this machine) ----------------
+LOCAL_SCRIPT=$(mktemp -t lp100a-redeploy.XXXXXX)
 build_remote() {
   cat <<'HEAD'
+#!/usr/bin/env bash
 set -euo pipefail
 echo "host: $(hostname) — kernel: $(uname -r)"
 sudo systemctl stop lp100a-server 2>/dev/null || true
@@ -119,17 +129,45 @@ HEAD
   cat <<'TAIL'
 sudo systemctl start lp100a-server
 sleep 1
-sudo systemctl is-active lp100a-server >/dev/null \
-  || { echo "service failed to start"; sudo journalctl -u lp100a-server -n 30 --no-pager; exit 1; }
+if ! sudo systemctl is-active --quiet lp100a-server; then
+  echo "service failed to start"
+  sudo journalctl -u lp100a-server -n 30 --no-pager
+  exit 1
+fi
 echo "service: $(systemctl is-active lp100a-server) ($(systemctl show lp100a-server --property=ActiveEnterTimestamp --value))"
 sudo journalctl -u lp100a-server -n 8 --no-pager
 TAIL
 }
+build_remote > "$LOCAL_SCRIPT"
 
+# --- 3. Open the SSH control connection (one auth prompt) ------------------
+step "Opening SSH session to $TARGET"
+if ! ssh "${SSH_OPTS[@]}" -o "ConnectTimeout=10" "$TARGET" true; then
+  echo "could not establish SSH session to $TARGET" >&2
+  exit 1
+fi
+
+# --- 4. Copy files to /tmp/ on the Pi --------------------------------------
+SCP_FILES=()
+[ "$RESTART_ONLY" -eq 0 ]   && SCP_FILES+=("$BIN")
+[ "$UPDATE_SERVICE" -eq 1 ] && SCP_FILES+=(deploy/lp100a-server.service)
+SCP_FILES+=("$LOCAL_SCRIPT")  # the install script always goes along
+
+step "Copying ${#SCP_FILES[@]} file(s) to $TARGET:/tmp/"
+# We need a stable remote name for the install script regardless of mktemp's
+# local basename. scp the regular files first, then the script under a fixed
+# remote path.
+if [ "${#SCP_FILES[@]}" -gt 1 ]; then
+  scp -q "${SSH_OPTS[@]}" "${SCP_FILES[@]:0:${#SCP_FILES[@]}-1}" "$TARGET:/tmp/"
+fi
+REMOTE_SCRIPT="/tmp/lp100a-redeploy.sh"
+scp -q "${SSH_OPTS[@]}" "$LOCAL_SCRIPT" "$TARGET:$REMOTE_SCRIPT"
+
+# --- 5. Run install script with a TTY so sudo can prompt --------------------
 step "Updating service on $TARGET"
-build_remote | ssh "$TARGET" 'bash -s'
+ssh -t "${SSH_OPTS[@]}" "$TARGET" "bash $REMOTE_SCRIPT; rm -f $REMOTE_SCRIPT"
 
-# 4. Health check from the dev machine.
+# --- 6. Health check from the dev machine ----------------------------------
 if [ "$HEALTHCHECK" -eq 1 ]; then
   HOST="${TARGET#*@}"
   step "Health check: http://$HOST:8088/healthz"
