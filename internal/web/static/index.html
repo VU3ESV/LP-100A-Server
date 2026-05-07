@@ -907,18 +907,38 @@
     else if (view === "peak_avg")        renderPeakAvg(d);
   }
 
+  // Effective Power / dBm helpers. The LP-100A's two numeric fields can
+  // disagree depending on its SETUP: the SWR Power Threshold setting can
+  // gate the Power field over serial (it reads 0 while a real signal is
+  // present), but the dBm field continues to report the detector reading.
+  // We trust whichever field has data above the detector's noise floor
+  // and back-compute the other from it. Thresholds:
+  //   Power > 0.01 W (10 mW)  → Power field has real data
+  //   dBm   > 1.5    (1.4 mW) → dBm   field has real data (above ~0.8 noise floor)
+  function isLive(d) {
+    return d.dbm > 1.5 || d.power_w > 0.01;
+  }
+  function effectivePower(d) {
+    if (d.power_w > 0.01) return d.power_w;
+    if (d.dbm > 1.5)      return Math.pow(10, (d.dbm - 30) / 10);
+    return 0;
+  }
+  function effectiveDbm(d) {
+    if (d.dbm > 1.5)      return d.dbm;
+    if (d.power_w > 0.01) return 10 * Math.log10(d.power_w * 1000);
+    return 0;
+  }
+
   function renderNormal(d) {
     // Power suffix follows the meter's mode (w / W / T per the LP-100A LCD).
     $("pwr-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
 
-    $("pwr-num").textContent = fmt(d.power_w, 1);
-    // Derive dBm/dBW from Power. Threshold is 0.1 W (100 mW) — above this
-    // the meter is reading a real signal; below, it's the detector noise
-    // floor (~1.2 mW = 0.8 dBm) which the meter reports continuously and
-    // which would otherwise show as "0.8 dBm" alongside Power "0.0 W".
-    const live = d.power_w > 0.1;
-    const dbm  = live ? 10 * Math.log10(d.power_w * 1000) : 0;
-    const dbw  = dbm > 30 ? dbm - 30 : 0;
+    const live  = isLive(d);
+    const watts = effectivePower(d);
+    const dbm   = effectiveDbm(d);
+    const dbw   = dbm > 30 ? dbm - 30 : 0;
+
+    $("pwr-num").textContent = fmt(watts, 1);
     $("dbm").textContent = live ? fmt(dbm, 1) : "--";
     $("dbw").textContent = live ? fmt(dbw, 1) : "--";
 
@@ -928,8 +948,8 @@
 
     updatePwrTicks(d.range);
     const pwrMax = RANGE_MAX[d.range] || 750;
-    $("pwr-fill").style.width = pctClamp((d.power_w / pwrMax) * 100) + "%";
-    $("bar-pwr-val").textContent = fmt(d.power_w, 1) + " " + (POWER_MODE_SUFFIX[d.mode] || "W");
+    $("pwr-fill").style.width = pctClamp((watts / pwrMax) * 100) + "%";
+    $("bar-pwr-val").textContent = fmt(watts, 1) + " " + (POWER_MODE_SUFFIX[d.mode] || "W");
 
     const swrPct = pctClamp(((d.swr - 1.0) / (SWR_MAX - 1.0)) * 100);
     const swrFill = $("swr-fill");
@@ -939,8 +959,8 @@
     $("bar-swr-val").textContent = fmt(d.swr, 2);
 
     const now = performance.now();
-    if (d.power_w > peakPwr) { peakPwr = d.power_w; peakPwrAt = now; }
-    if (d.swr     > peakSwr) { peakSwr = d.swr;     peakSwrAt = now; }
+    if (watts > peakPwr) { peakPwr = watts; peakPwrAt = now; }
+    if (d.swr > peakSwr) { peakSwr = d.swr; peakSwrAt = now; }
   }
 
   function renderVector(d) {
@@ -977,14 +997,13 @@
   }
 
   function renderFieldStrength(d) {
-    // FS measures the rear-panel direct input (separate signal path from
-    // the couplers), so we use the meter's dBm field directly. Mask the
-    // detector noise floor (~0.8 dBm) which the meter reports continuously
-    // when no signal is connected to the direct input. Real FS readings
-    // above ~1.5 dBm (~1.4 mW) come through; below that we can't reliably
-    // distinguish a real low-level signal from the noise floor.
-    const dbm = d.dbm;
-    const live = dbm > 1.5;
+    // Use the same effective-value logic as DBM/RL. The meter's dBm field
+    // reads detector noise floor (~0.8 dBm) when no signal is on the
+    // rear-panel direct input; real FS readings above ~1.5 dBm come
+    // through. If a TX signal is present (Power field active), we'll
+    // back-compute and show that too.
+    const live = isLive(d);
+    const dbm  = effectiveDbm(d);
 
     $("fs-dbm").textContent = live ? fmt(dbm, 1) : "--";
 
@@ -1034,17 +1053,14 @@
   }
 
   function renderDbm(d) {
-    // Derive dBm from Power (couplers measure both). Mask below 0.1 W since
-    // the meter reports its detector noise floor (~1.2 mW / 0.8 dBm) all
-    // the time at no signal — that small but non-zero Power round-trips
-    // back to "0.8 dBm" if we just compute from it blindly.
-    const live = d.power_w > 0.1;
-    const dbm  = live ? 10 * Math.log10(d.power_w * 1000) : 0;
-
     $("dbm-w-unit").textContent = POWER_MODE_SUFFIX[d.mode] || "W";
 
+    const live  = isLive(d);
+    const watts = effectivePower(d);
+    const dbm   = effectiveDbm(d);
+
     $("dbm-dbm").textContent = live ? fmt(dbm, 1) : "--";
-    $("dbm-w").textContent   = fmt(d.power_w, 1);
+    $("dbm-w").textContent   = fmt(watts, 1);
     $("dbm-swr").textContent = fmt(d.swr, 2);
 
     // RL = -20·log10(|Γ|), |Γ| = (SWR-1)/(SWR+1). Conventionally shown
@@ -1054,9 +1070,9 @@
     $("dbm-rl").textContent = isFinite(rl) ? fmt(rl, 1) : "∞";
     $("dbm-mismatch").textContent = fmt(gamma * gamma * 100, 2);
 
-    // dBm bar: scale 0..70 dBm (1 µW to 10 kW)
+    // dBm bar: scale 0..70 dBm (1 µW to 10 kW).
     $("dbm-bar").style.width = live ? pctClamp((dbm / 70) * 100) + "%" : "0%";
-    // RL bar: 0 dB (worst) to 40 dB (excellent), full bar at 40 dB
+    // RL bar: 0 dB (worst) to 40 dB (excellent), full bar at 40 dB.
     const rlPct = isFinite(rl) ? pctClamp((rl / 40) * 100) : 100;
     $("rl-bar").style.width = rlPct + "%";
   }
