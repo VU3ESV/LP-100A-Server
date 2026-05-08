@@ -1,0 +1,774 @@
+[
+    {
+        "id": "lp100aws-flow",
+        "type": "tab",
+        "label": "LP100A-WS",
+        "disabled": false,
+        "info": "WebSocket variant of the LP-100A dashboard. Talks to the\nlp100a-server (https://github.com/VU3ESV/LP-100A-Server) over\n`/ws` instead of opening the meter's COM port directly.\n\nEdit the `lp100aws-ws-client` config node to point at your server\n(default: ws://localhost:8088/ws). The serialport, parsing, range\ndeadbands, and alarm-trip logic are all handled server-side, so this\nflow is dramatically simpler than LP100A.json.\n",
+        "env": []
+    },
+    {
+        "id": "lp100aws-cmt-info",
+        "type": "comment",
+        "z": "lp100aws-flow",
+        "name": "About this flow",
+        "info": "Source: lp100a-server (Go) at ws://<host>:8088/ws.\nIncoming JSON:\n  { type:\"telemetry\", seq, ts, data:{ power_w, z_ohm, phase_deg,\n     swr, dbm, dbw, range, mode, alarm_setpoint, alarm_tripped,\n     callsign } }\n  { type:\"heartbeat\", seq, ts }\n  { type:\"status\", level, msg }\n  { type:\"ack\", ref, ok }\n\nOutgoing JSON (control):\n  { type:\"command\", id, action:\"alarm_step\"|\"mode_step\"|\"peak_toggle\" }\n\nThis flow drops the Node-RED-side serial parsing because the server\nalready: parses the 9-field CSV, suppresses jitter (per-field deadbands\nin internal/meter/snapshot.go), converts dBm→dBW, computes alarm-trip,\nand maps range/mode/alarm bytes to readable names.\n",
+        "x": 130,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-cmt-revhist",
+        "type": "comment",
+        "z": "lp100aws-flow",
+        "name": "Rev history",
+        "info": "Adapted from LP100A.json (serial flow by LB9KJ).\nWebSocket port: 2026-05-08.\n",
+        "x": 110,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-wsin",
+        "type": "websocket in",
+        "z": "lp100aws-flow",
+        "name": "WS in",
+        "server": "",
+        "client": "lp100aws-ws-client",
+        "x": 130,
+        "y": 220,
+        "wires": [
+            [
+                "lp100aws-json"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-json",
+        "type": "json",
+        "z": "lp100aws-flow",
+        "name": "parse",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 290,
+        "y": 220,
+        "wires": [
+            [
+                "lp100aws-switch-type"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-switch-type",
+        "type": "switch",
+        "z": "lp100aws-flow",
+        "name": "by type",
+        "property": "payload.type",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "telemetry",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "heartbeat",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "status",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "ack",
+                "vt": "str"
+            }
+        ],
+        "checkall": "false",
+        "repair": false,
+        "outputs": 4,
+        "x": 450,
+        "y": 220,
+        "wires": [
+            [
+                "lp100aws-fan"
+            ],
+            [
+                "lp100aws-online"
+            ],
+            [
+                "lp100aws-debug-status"
+            ],
+            [
+                "lp100aws-debug-ack"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-fan",
+        "type": "function",
+        "z": "lp100aws-flow",
+        "name": "Fan telemetry",
+        "func": "// Fan one telemetry frame to one output per UI widget.\n// Input: msg.payload = { type:\"telemetry\", data:{...} }\nconst d = msg.payload.data || {};\nconst power = Number(d.power_w) || 0;\n\n// Z and Phase are meaningless when the radio isn't keyed; suppress them\n// the same way the original serial flow did (\"--\" placeholder).\nconst dim = (v, decimals) =>\n    power < 0.1 ? \"--\" : Number(v).toFixed(decimals);\n\nconst modeLabel = ({\n    average: \"Average\",\n    peak_hold: \"Peak Hold\",\n    tune: \"Tune\"\n})[d.mode] || \"-\";\n\nreturn [\n    { payload: power },                                       // 1: Watts level\n    { payload: Number(d.swr) || 0 },                          // 2: SWR level\n    { payload: Number(d.dbw) || 0 },                          // 3: dBW level\n    { payload: dim(d.z_ohm, 1) },                             // 4: Z text\n    { payload: dim(d.phase_deg, 1) },                         // 5: Phase text\n    { payload: { range: d.range, power_w: power } },          // 6: Range LEDs + control\n    { payload: modeLabel },                                   // 7: Mode label\n    {                                                         // 8: Alarm label + color\n        payload: d.alarm_setpoint,\n        color: d.alarm_tripped ? \"red\" : \"white\"\n    },\n    { payload: d.callsign }                                   // 9: Callsign\n];\n",
+        "outputs": 9,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 290,
+        "y": 360,
+        "wires": [
+            [
+                "lp100aws-watts"
+            ],
+            [
+                "lp100aws-swr"
+            ],
+            [
+                "lp100aws-dbw"
+            ],
+            [
+                "lp100aws-z"
+            ],
+            [
+                "lp100aws-phase"
+            ],
+            [
+                "lp100aws-range"
+            ],
+            [
+                "lp100aws-mode"
+            ],
+            [
+                "lp100aws-alarm"
+            ],
+            [
+                "lp100aws-id"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-range",
+        "type": "function",
+        "z": "lp100aws-flow",
+        "name": "Range LEDs",
+        "func": "// Drive the Hi/Mid/Lo LEDs and update the Watts level's max scale\n// based on which range the meter reports.\nconst { range, power_w } = msg.payload || {};\n\nlet hi = false, mid = false, lo = false, max = 750;\nswitch (range) {\n    case \"high\": hi = true;  max = 750; break;\n    case \"mid\":  mid = true; max = 125; break;\n    case \"low\":  lo = true;  max = 25;  break;\n}\n\nreturn [\n    { payload: hi },\n    { payload: mid },\n    { payload: lo },\n    { payload: power_w, control: { min: 0, max } }\n];\n",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 480,
+        "wires": [
+            [
+                "lp100aws-led-hi"
+            ],
+            [
+                "lp100aws-led-mid"
+            ],
+            [
+                "lp100aws-led-lo"
+            ],
+            [
+                "lp100aws-watts"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-watts",
+        "type": "ui_level",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 5,
+        "width": 0,
+        "height": 0,
+        "name": "Watts",
+        "label": "PWR : ",
+        "colorHi": "#e60000",
+        "colorWarn": "#ff9900",
+        "colorNormal": "#00ff55",
+        "colorOff": "#595959",
+        "min": 0,
+        "max": "750",
+        "segWarn": "600",
+        "segHigh": "700",
+        "unit": "W",
+        "layout": "sh",
+        "channelA": "",
+        "channelB": "",
+        "decimals": "1",
+        "animations": "off",
+        "shape": "2",
+        "colorschema": "fixed",
+        "textoptions": "custom",
+        "colorText": "#eeeeee",
+        "fontLabel": "",
+        "fontValue": "",
+        "fontSmall": "0.8",
+        "colorFromTheme": true,
+        "textAnimations": false,
+        "hideValue": false,
+        "tickmode": "off",
+        "peakmode": true,
+        "property": "payload",
+        "peaktime": 3000,
+        "x": 870,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-swr",
+        "type": "ui_level",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 6,
+        "width": 0,
+        "height": 0,
+        "name": "SWRlp",
+        "label": "SWR : ",
+        "colorHi": "#e60000",
+        "colorWarn": "#ff9900",
+        "colorNormal": "#00fa53",
+        "colorOff": "#595959",
+        "min": "1",
+        "max": "5",
+        "segWarn": "1.5",
+        "segHigh": "2",
+        "unit": "",
+        "layout": "sh",
+        "channelA": "",
+        "channelB": "",
+        "decimals": "1",
+        "animations": "off",
+        "shape": "2",
+        "colorschema": "fixed",
+        "textoptions": "custom",
+        "colorText": "#eeeeee",
+        "fontLabel": "",
+        "fontValue": "",
+        "fontSmall": "0.8",
+        "colorFromTheme": true,
+        "textAnimations": false,
+        "hideValue": false,
+        "tickmode": "off",
+        "peakmode": true,
+        "property": "payload",
+        "peaktime": 3000,
+        "x": 870,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-dbw",
+        "type": "ui_level",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 7,
+        "width": 0,
+        "height": 0,
+        "name": "dbW",
+        "label": "RF : ",
+        "colorHi": "#e60000",
+        "colorWarn": "#fae900",
+        "colorNormal": "#00ff55",
+        "colorOff": "#595959",
+        "min": "0",
+        "max": "34",
+        "segWarn": "28",
+        "segHigh": "31.5",
+        "unit": "dbW",
+        "layout": "sh",
+        "channelA": "",
+        "channelB": "",
+        "decimals": "1",
+        "animations": "off",
+        "shape": "2",
+        "colorschema": "fixed",
+        "textoptions": "custom",
+        "colorText": "#eeeeee",
+        "fontLabel": "",
+        "fontValue": "",
+        "fontSmall": "0.8",
+        "colorFromTheme": true,
+        "textAnimations": false,
+        "hideValue": false,
+        "tickmode": "off",
+        "peakmode": true,
+        "property": "payload",
+        "peaktime": 3000,
+        "x": 870,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-z",
+        "type": "ui_text",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 11,
+        "width": 3,
+        "height": 1,
+        "name": "Z",
+        "label": "Z",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 870,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-phase",
+        "type": "ui_text",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 12,
+        "width": 3,
+        "height": 1,
+        "name": "Phase",
+        "label": "Phase",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 870,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-led-hi",
+        "type": "ui_led",
+        "z": "lp100aws-flow",
+        "order": 4,
+        "group": "lp100aws-group",
+        "width": 2,
+        "height": 1,
+        "label": "Hi",
+        "labelPlacement": "left",
+        "labelAlignment": "left",
+        "colorForValue": [
+            {
+                "color": "#ff0000",
+                "value": "false",
+                "valueType": "bool"
+            },
+            {
+                "color": "#008000",
+                "value": "true",
+                "valueType": "bool"
+            }
+        ],
+        "allowColorForValueInMessage": false,
+        "shape": "circle",
+        "showGlow": true,
+        "name": "High",
+        "x": 870,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-led-mid",
+        "type": "ui_led",
+        "z": "lp100aws-flow",
+        "order": 3,
+        "group": "lp100aws-group",
+        "width": 2,
+        "height": 1,
+        "label": "Mid",
+        "labelPlacement": "left",
+        "labelAlignment": "left",
+        "colorForValue": [
+            {
+                "color": "#ff0000",
+                "value": "false",
+                "valueType": "bool"
+            },
+            {
+                "color": "#008000",
+                "value": "true",
+                "valueType": "bool"
+            }
+        ],
+        "allowColorForValueInMessage": false,
+        "shape": "circle",
+        "showGlow": true,
+        "name": "Mid",
+        "x": 870,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-led-lo",
+        "type": "ui_led",
+        "z": "lp100aws-flow",
+        "order": 2,
+        "group": "lp100aws-group",
+        "width": 2,
+        "height": 1,
+        "label": "Lo",
+        "labelPlacement": "left",
+        "labelAlignment": "left",
+        "colorForValue": [
+            {
+                "color": "#ff0000",
+                "value": "false",
+                "valueType": "bool"
+            },
+            {
+                "color": "#008000",
+                "value": "true",
+                "valueType": "bool"
+            }
+        ],
+        "allowColorForValueInMessage": false,
+        "shape": "circle",
+        "showGlow": true,
+        "name": "Low",
+        "x": 870,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-mode",
+        "type": "ui_switch",
+        "z": "lp100aws-flow",
+        "name": "Mode Sel",
+        "label": "Meter Mode : {{msg.payload}}",
+        "tooltip": "Cycle Peak-mode: Average -> Peak Hold -> Tune",
+        "group": "lp100aws-group",
+        "order": 8,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "decouple": "false",
+        "topic": "",
+        "topicType": "str",
+        "style": "",
+        "onvalue": "mode_step",
+        "onvalueType": "str",
+        "onicon": "fa-rotate-right fa-lg",
+        "oncolor": "white",
+        "offvalue": "mode_step",
+        "offvalueType": "str",
+        "officon": "fa-rotate-right fa-lg",
+        "offcolor": "white",
+        "animate": true,
+        "className": "",
+        "x": 870,
+        "y": 720,
+        "wires": [
+            [
+                "lp100aws-cmd-build"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-alarm",
+        "type": "ui_switch",
+        "z": "lp100aws-flow",
+        "name": "AlarmSel",
+        "label": "<font color={{msg.color}}>SWR Alarm : {{msg.payload}}",
+        "tooltip": "Step the SWR alarm setpoint: off -> 1.5 -> 2.0 -> 2.5 -> 3.0 -> user",
+        "group": "lp100aws-group",
+        "order": 9,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "decouple": "false",
+        "topic": "",
+        "topicType": "str",
+        "style": "",
+        "onvalue": "alarm_step",
+        "onvalueType": "str",
+        "onicon": "fa-rotate-right fa-lg",
+        "oncolor": "white",
+        "offvalue": "alarm_step",
+        "offvalueType": "str",
+        "officon": "fa-rotate-right fa-lg",
+        "offcolor": "white",
+        "animate": true,
+        "className": "",
+        "x": 870,
+        "y": 680,
+        "wires": [
+            [
+                "lp100aws-cmd-build"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-pkbtn",
+        "type": "ui_button",
+        "z": "lp100aws-flow",
+        "name": "",
+        "group": "lp100aws-group",
+        "order": 10,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "Peak / Avg / Tune",
+        "tooltip": "Send the F (peak_toggle) verb",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "payload": "peak_toggle",
+        "payloadType": "str",
+        "topic": "",
+        "topicType": "str",
+        "x": 870,
+        "y": 760,
+        "wires": [
+            [
+                "lp100aws-cmd-build"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-id",
+        "type": "ui_text",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 13,
+        "width": 0,
+        "height": 0,
+        "name": "ID",
+        "label": "ID",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 870,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-title",
+        "type": "ui_text",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "Title",
+        "label": "<font color = #66ff66 size=\"5\">LP-100A (WS)",
+        "format": "",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 870,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-cmd-build",
+        "type": "function",
+        "z": "lp100aws-flow",
+        "name": "Build command",
+        "func": "// Inputs from any of three UI widgets (button or switch).\n// msg.payload is the action verb itself: \"peak_toggle\",\n// \"mode_step\", or \"alarm_step\". Wrap it in the wire-protocol\n// envelope expected by lp100a-server (PROPOSAL.md §4).\nconst id = (Math.random() * 1e9 | 0).toString(36);\nreturn {\n    payload: JSON.stringify({\n        type: \"command\",\n        id,\n        action: msg.payload\n    })\n};\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1090,
+        "y": 720,
+        "wires": [
+            [
+                "lp100aws-wsout"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-wsout",
+        "type": "websocket out",
+        "z": "lp100aws-flow",
+        "name": "WS out",
+        "server": "",
+        "client": "lp100aws-ws-client",
+        "x": 1250,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-status",
+        "type": "status",
+        "z": "lp100aws-flow",
+        "name": "WS status",
+        "scope": [
+            "lp100aws-wsin",
+            "lp100aws-wsout"
+        ],
+        "x": 130,
+        "y": 880,
+        "wires": [
+            [
+                "lp100aws-status-fmt"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-status-fmt",
+        "type": "function",
+        "z": "lp100aws-flow",
+        "name": "Status -> label",
+        "func": "// Map node-status events from the websocket nodes to a friendly\n// indicator string for the dashboard. Green = connected, red = down.\nconst s = msg.status || {};\nconst online = s.fill === \"green\";\nreturn {\n    payload: online ? \"ONLINE\" : (s.text || \"OFFLINE\"),\n    color: online ? \"#00ff55\" : \"#e60000\"\n};\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 880,
+        "wires": [
+            [
+                "lp100aws-conn"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-online",
+        "type": "change",
+        "z": "lp100aws-flow",
+        "name": "online (heartbeat)",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "ONLINE",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "color",
+                "pt": "msg",
+                "to": "#00ff55",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 660,
+        "y": 220,
+        "wires": [
+            [
+                "lp100aws-conn"
+            ]
+        ]
+    },
+    {
+        "id": "lp100aws-conn",
+        "type": "ui_text",
+        "z": "lp100aws-flow",
+        "group": "lp100aws-group",
+        "order": 14,
+        "width": 0,
+        "height": 0,
+        "name": "Conn",
+        "label": "Server",
+        "format": "<font color={{msg.color}}>{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 870,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-debug-status",
+        "type": "debug",
+        "z": "lp100aws-flow",
+        "name": "status frames",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 670,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-debug-ack",
+        "type": "debug",
+        "z": "lp100aws-flow",
+        "name": "ack frames",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "lp100aws-ws-client",
+        "type": "websocket-client",
+        "path": "ws://localhost:8088/ws",
+        "tls": "",
+        "wholemsg": "false",
+        "hb": "30000",
+        "subprotocol": ""
+    },
+    {
+        "id": "lp100aws-group",
+        "type": "ui_group",
+        "name": "LP-100A (WS)",
+        "tab": "lp100aws-uitab",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "lp100aws-uitab",
+        "type": "ui_tab",
+        "name": "LP-100A WebSocket",
+        "icon": "dashboard",
+        "order": 2,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "lp100aws-globalcfg",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6",
+            "node-red-contrib-ui-level": "0.1.46",
+            "node-red-contrib-ui-led": "0.4.11"
+        }
+    }
+]
