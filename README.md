@@ -45,18 +45,19 @@ Two GitHub Actions workflows ship with the repo:
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push
   and pull request to `main`: `go vet`, `go test -race`, `go build`. Required
   before merging a branch.
-- [`.github/workflows/release.yml`](.github/workflows/release.yml) is
-  triggered manually from the **Actions** tab. Pick *Release* → *Run
-  workflow*, type a tag like `v1.0.0`, and it will:
-  1. Tag the current `main` commit,
-  2. Cross-compile binaries for `linux/{amd64,arm64,armv7}`,
-     `darwin/{amd64,arm64}`, and `windows/amd64`,
-  3. Publish a GitHub Release with the binaries + a `SHA256SUMS` file
-     attached and changelog auto-generated from commits since the previous
-     release.
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) cuts a
+  release **for every PR merged into `main`**:
+  1. Bump the patch of the highest `vX.Y.Z` tag (`v0.2.0` → `v0.2.1`),
+  2. `go vet` + `go test -race`, then cross-compile binaries for
+     `linux/{amd64,arm64,armv7}`, `darwin/{amd64,arm64}`, and `windows/amd64`,
+  3. Tag the merge commit and publish a GitHub Release with the binaries + a
+     `SHA256SUMS` file and notes generated from the merged PRs.
 
-  Locally you don't need to run anything — Watchers of the repo get a
-  GitHub notification when the release is published.
+  Direct pushes to `main` and docs-only PRs (`*.md`, `docs/**`, `LICENSE`)
+  don't release. For a minor / major bump, or a release on demand, use the
+  **Actions** tab: *Release* → *Run workflow*, with a version like `v0.3.0`
+  (blank = the next patch). Watchers of the repo get a GitHub notification
+  when a release is published.
 
 ## Deploying on the Raspberry Pi
 

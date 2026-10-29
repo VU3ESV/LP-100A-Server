@@ -1,46 +1,115 @@
 name: Release
 
-# Manually triggered from the Actions tab. Provide a tag like "v1.0.0";
-# the workflow tags the current main commit, cross-compiles for every
-# supported platform, and publishes a GitHub Release with the binaries
-# attached and changelog auto-generated from commits since the previous
-# release.
+# Every PR merged into main cuts a release: the patch number of the highest
+# vX.Y.Z tag is bumped (v0.2.0 -> v0.2.1), every supported platform is
+# cross-compiled, and a GitHub Release is published with the binaries, a
+# SHA256SUMS file and notes generated from the merged PRs.
+#
+# Trigger is a push to main, not `pull_request: closed`: a PR from a fork
+# gets a read-only GITHUB_TOKEN on pull_request events, so creating the
+# release would fail with 403. The gate keeps "PR merges only" by looking up
+# the merged PR the pushed commit belongs to: direct pushes to main and
+# docs-only PRs (*.md, docs/**, LICENSE) don't release.
+#
+# Minor / major bump, or releasing on demand: Actions -> Release -> Run
+# workflow, with a version such as v0.3.0 (blank = the next patch).
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version tag (must look like vX.Y.Z, e.g. v1.0.0)'
-        required: true
-        type: string
+        description: 'Version to release (vX.Y.Z). Blank = bump the latest tag''s patch.'
+        required: false
 
 permissions:
   contents: write  # needed to create tags/releases and upload assets
 
+# One release at a time, so two quick merges bump from each other's tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  gate:
+    name: Decide whether to release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # The merged PR this push belongs to (merge, squash and rebase merges all list it).
+          pr="$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+                 -q '[.[] | select(.merged_at != null and .base.ref == "main")][0].number // empty')"
+          if [ -z "$pr" ]; then
+            echo "Direct push to main (no merged PR): CI only, no release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files="$(gh api --paginate "repos/${{ github.repository }}/pulls/$pr/files" -q '.[].filename')"
+          printf 'PR #%s changed:\n%s\n' "$pr" "$files"
+          skip=true
+          while IFS= read -r f; do
+            case "$f" in
+              *.md|docs/*|LICENSE) : ;;
+              *) skip=false; break ;;
+            esac
+          done <<< "$files"
+          [ "$skip" = true ] && echo "Docs-only PR: no release."
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     name: build + publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history so auto-generated notes can diff against the previous tag
+          fetch-depth: 0  # all tags (version bump) and history (generated notes)
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
           cache: true
 
-      - name: Validate version
+      - name: Resolve version
+        id: ver
+        env:
+          WANT: ${{ inputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
+          set -euo pipefail
+          if [ -n "${WANT:-}" ]; then
+            VERSION="$WANT"
+          else
+            # Patch bump of the highest plain vX.Y.Z tag (pre-releases such as
+            # v1.0.0-rc.1 are not a base).
+            LATEST="$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+            IFS=. read -r MAJ MIN PAT <<< "${LATEST:-v0.0.0}"
+            VERSION="${MAJ}.${MIN}.$((PAT + 1))"
+            echo "bumping ${LATEST:-none} -> $VERSION"
+          fi
           if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::version must look like vX.Y.Z (got: $VERSION)"
-            exit 1
+            echo "::error::version must look like vX.Y.Z (got: $VERSION)"; exit 1
           fi
-          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "::error::tag $VERSION already exists"
-            exit 1
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::tag $VERSION already exists"; exit 1
           fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Vet + test
+        run: |
+          go vet ./...
+          go test -race ./...
 
       - name: Build binaries
         env:
@@ -61,9 +130,10 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          gh release create "${{ inputs.version }}" \
+          gh release create "$VERSION" \
             --target "${{ github.sha }}" \
-            --title "${{ inputs.version }}" \
+            --title "$VERSION" \
             --generate-notes \
             dist/*
