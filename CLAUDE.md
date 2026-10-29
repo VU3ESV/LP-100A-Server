@@ -105,6 +105,9 @@ not a parser bug; do not "fix" it by re-deriving Power from dBm.
   (`COMx` vs `/dev/ttyUSB*` vs `/dev/cu.*`). The Pi is the primary target;
   see [README.md](README.md) for the install / redeploy flow.
 - **Auth:** none. Bind to LAN; network-level trust only. Document this loudly.
+  `/ws` keeps gorilla's same-origin check (`CheckOrigin` left nil) — never
+  reintroduce `return true`. For a login + TLS, bind `127.0.0.1` behind a
+  reverse proxy (README "Security").
 
 ## HTTP surface
 
